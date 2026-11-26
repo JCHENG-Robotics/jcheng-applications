@@ -241,6 +241,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                             }
                             for step in plan.steps
                         ],
+                        "facts": {
+                            name: {
+                                "from_step": fact.from_step,
+                                "index": fact.index,
+                                "at_least_rad": fact.at_least_rad,
+                                "at_most_rad": fact.at_most_rad,
+                            }
+                            for name, fact in plan.facts.items()
+                        },
+                        "branches": [
+                            {
+                                "id": branch.id,
+                                "after": branch.after,
+                                "required": branch.required,
+                                "priority": branch.priority,
+                                "conditions": [list(item) for item in branch.conditions],
+                                "steps": [
+                                    {
+                                        "index": step.index,
+                                        "name": step.name,
+                                        "kind": step.kind,
+                                        "profile": step.profile,
+                                        "scopes": list(step.scopes),
+                                        "idempotency_key": step.idempotency_key,
+                                    }
+                                    for step in branch.steps
+                                ],
+                            }
+                            for branch in plan.branches
+                        ],
                     },
                     indent=2,
                     sort_keys=True,
@@ -250,7 +280,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         print(
             f"plan {plan.recipe_name} {plan.recipe_version} "
-            f"run={plan.run_id} steps={len(plan.steps)}"
+            f"run={plan.run_id} steps={len(plan.steps)} "
+            f"branches={len(plan.branches)}"
         )
         for step in plan.steps:
             print(

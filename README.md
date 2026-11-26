@@ -7,8 +7,10 @@
 > planning, a fail-closed runner over an abstract gateway port, an M2 read-only
 > transport and an M3 supervised `run` against a mock gateway. The shared
 > execution core is extracted; an opt-in M1.5 py_trees engine and independent
-> Run Supervisor are available behind `--engine tree`. The default is still the
-> linear engine. No hardware is used and nothing here runs on the robot.
+> Run Supervisor are available behind `--engine tree`. S3 v0 declared branches
+> and a three-valued selector run on the linear engine with positional arm
+> facts. The default is still the linear engine. No hardware is used and
+> nothing here runs on the robot.
 > English canonical; the Chinese README is a translation.
 
 `jcheng-applications` is the L4 task-orchestration application of the JCHENG
@@ -60,7 +62,8 @@ jcheng-applications/
 │   ├── TASK_ENGINE.md              # design: tree executor, supervisor and strategy selection
 │   └── M1_5_VALIDATION.md          # isolated py_trees technical validation report
 ├── recipes/
-│   └── example-supervised-transfer.yaml  # offline example; not a hardware program
+│   ├── example-supervised-transfer.yaml  # v0.1 offline example; not a hardware program
+│   └── example-declared-branch.yaml      # v0.2 facts/branch example; mock-sized values
 ├── src/jcheng_applications/
 │   ├── model.py                    # recipe model, contract constants and planner
 │   ├── gateway.py                  # GatewayPort protocol and contract parsers
@@ -81,6 +84,7 @@ jcheng-applications/
 ├── evidence/20261126_m3_supervised/# M3 L3 supervised-run evidence
 ├── evidence/20261126_m1_5_tree/    # M1.5 tree engine L3 evidence
 ├── evidence/20261126_t_c06/        # T-C06 full RunReport parity evidence
+├── evidence/20261126_s3_branches/  # S3 declared-branch L3 evidence
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -159,6 +163,7 @@ executes motion itself.
 | Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | Shared Execution Core; linear and tree engines | Verified (L2, 2026-11-26) | `tests/test_core.py`; T-C06 12-case exact `RunReport` parity; `evidence/20261126_shared_core/`, `evidence/20261126_t_c06/` |
 | Opt-in py_trees engine + independent deadline/cancel/stop supervisor | Verified (L2/L3, 2026-11-26) | `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/`; py_trees extra not default; licence review open |
+| Declared branches + positional arm facts + three-valued selector (linear engine) | Verified (L1–L3, 2026-11-26) | `tests/test_branches.py`; `evidence/20261126_s3_branches/`; named/gripper facts and tree branches pending |
 | Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
 | Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
 | Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |

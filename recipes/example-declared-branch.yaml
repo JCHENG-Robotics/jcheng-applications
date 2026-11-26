@@ -1,0 +1,50 @@
+# Offline example for the S3 declared-branch format (recipe format 0.2).
+#
+# The fact is a positional measured value, not a named joint: the gateway
+# contract returns measured_positions as an array. Index 0 is the first joint
+# in the robot profile. This is not a hardware program; the values are small
+# placeholders for the mock profile.
+name: example-declared-branch
+version: 0.2.0
+description: >-
+  Single-joint approach followed by an optional declared branch when the
+  measured first joint has moved at least 0.02 rad. Placeholder values only;
+  not a hardware program.
+contract_hash: "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42"
+scopes: [arm]
+facts:
+  joint1_moved:
+    from_step: approach-j1
+    measured:
+      index: 0
+      at_least_rad: 0.02
+branches:
+  - id: adjust-j1.v1
+    after: approach-j1
+    required: false
+    priority: 10
+    when:
+      - fact: joint1_moved
+        equals: true
+    steps:
+      - name: adjust-j1
+        kind: JOINT_STEP
+        profile: step
+        scopes: [arm]
+        params:
+          joint_names: [joint1]
+          target_positions: [0.05]
+          max_velocity_rad_s: 0.4
+          duration_s: 1.0
+          verify_bus: true
+steps:
+  - name: approach-j1
+    kind: JOINT_STEP
+    profile: step
+    scopes: [arm]
+    params:
+      joint_names: [joint1]
+      target_positions: [0.03]
+      max_velocity_rad_s: 0.4
+      duration_s: 1.0
+      verify_bus: true

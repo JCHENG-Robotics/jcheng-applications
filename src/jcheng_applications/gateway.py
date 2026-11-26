@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import math
 import re
 from typing import Any, Mapping, Protocol
 
@@ -76,6 +77,7 @@ class MotionResult:
     bus_verified: bool
     safety_state: str | None = None
     stop_latched: bool | None = None
+    measured_positions: tuple[float, ...] | None = None
 
 
 class GatewayPort(Protocol):
@@ -207,6 +209,25 @@ def motion_result_from_mapping(payload: Any) -> MotionResult:
         safety_state = snapshot.state
         stop_latched = snapshot.stop_latched
 
+    raw_positions = root.get("measured_positions")
+    measured_positions = None
+    if raw_positions is not None:
+        if not isinstance(raw_positions, list):
+            raise GatewayProtocolError("result.measured_positions: must be a list")
+        values: list[float] = []
+        for index, value in enumerate(raw_positions):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise GatewayProtocolError(
+                    f"result.measured_positions[{index}]: must be a number"
+                )
+            number = float(value)
+            if not math.isfinite(number):
+                raise GatewayProtocolError(
+                    f"result.measured_positions[{index}]: must be finite"
+                )
+            values.append(number)
+        measured_positions = tuple(values)
+
     return MotionResult(
         intent_id=_text(root.get("intent_id"), "result.intent_id"),
         outcome=outcome,
@@ -217,6 +238,7 @@ def motion_result_from_mapping(payload: Any) -> MotionResult:
         bus_verified=_bool(root.get("bus_verified"), "result.bus_verified"),
         safety_state=safety_state,
         stop_latched=stop_latched,
+        measured_positions=measured_positions,
     )
 
 

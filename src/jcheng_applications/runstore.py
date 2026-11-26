@@ -40,6 +40,39 @@ def plan_digest(plan: Any) -> str:
             }
             for step in plan.steps
         ],
+        "facts": {
+            name: {
+                "from_step": fact.from_step,
+                "index": fact.index,
+                "at_least_rad": fact.at_least_rad,
+                "at_most_rad": fact.at_most_rad,
+            }
+            for name, fact in plan.facts.items()
+        },
+        "branches": [
+            {
+                "id": branch.id,
+                "after": branch.after,
+                "required": branch.required,
+                "priority": branch.priority,
+                "conditions": [list(item) for item in branch.conditions],
+                "steps": [
+                    {
+                        "index": step.index,
+                        "branch_id": step.branch_id,
+                        "branch_index": step.branch_index,
+                        "name": step.name,
+                        "kind": step.kind,
+                        "profile": step.profile,
+                        "scopes": list(step.scopes),
+                        "params": step.params,
+                        "idempotency_key": step.idempotency_key,
+                    }
+                    for step in branch.steps
+                ],
+            }
+            for branch in plan.branches
+        ],
     }
     return _sha256(canonical_json(payload))
 
@@ -66,11 +99,32 @@ def _report_payload(report: Any) -> dict[str, Any]:
                 "idempotency_key": step.idempotency_key,
                 "bus_verified": step.bus_verified,
                 "safety_state": step.safety_state,
+                "measured_positions": (
+                    list(step.measured_positions)
+                    if step.measured_positions is not None
+                    else None
+                ),
             }
             for step in report.steps
         ],
         "abort_reason": report.abort_reason,
         "stop_error": report.stop_error,
+        "selections": [
+            {
+                "after_step": record.after_step,
+                "candidates": [
+                    {
+                        "branch_id": candidate.branch_id,
+                        "guard": candidate.guard,
+                        "selected": candidate.selected,
+                    }
+                    for candidate in record.candidates
+                ],
+                "selected": record.selected,
+                "reason": record.reason,
+            }
+            for record in report.selections
+        ],
     }
 
 

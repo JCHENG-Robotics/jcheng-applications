@@ -84,6 +84,7 @@ class StepExecutor:
             idempotency_key=step.idempotency_key,
             bus_verified=result.bus_verified,
             safety_state=result.safety_state,
+            measured_positions=result.measured_positions,
         )
         classification: Classification = classify(step, result)
         return StepOutcome(report, classification.decision, classification.reason)

@@ -11,7 +11,7 @@ requires a new interfaces tag and a matching update here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 import json
 import math
@@ -87,9 +87,26 @@ _REQUIRED_KIND_PARAMS = {
 }
 
 _TOP_LEVEL_KEYS = frozenset(
+    {
+        "name",
+        "version",
+        "description",
+        "contract_hash",
+        "scopes",
+        "steps",
+        "facts",
+        "branches",
+    }
+)
+_REQUIRED_TOP_LEVEL_KEYS = frozenset(
     {"name", "version", "description", "contract_hash", "scopes", "steps"}
 )
 _STEP_KEYS = frozenset({"name", "kind", "profile", "scopes", "params"})
+_FACT_KEYS = frozenset({"from_step", "measured"})
+_MEASURED_KEYS = frozenset({"index", "at_least_rad", "at_most_rad"})
+_BRANCH_KEYS = frozenset({"id", "after", "required", "priority", "when", "steps"})
+_CONDITION_KEYS = frozenset({"fact", "equals"})
+_BRANCH_ID_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,63}$")
 
 
 class RecipeError(ValueError):
@@ -108,6 +125,33 @@ class Step:
 
 
 @dataclass(frozen=True)
+class FactSpec:
+    """A measured-position fact declared by a recipe.
+
+    v0 facts use a positional index into ``MotionResult.measured_positions``;
+    the gateway contract does not carry joint names or a gripper measurement.
+    """
+
+    name: str
+    from_step: str
+    index: int
+    at_least_rad: float | None
+    at_most_rad: float | None
+
+
+@dataclass(frozen=True)
+class BranchSpec:
+    """A declared recovery branch anchored after a main step."""
+
+    id: str
+    after: str
+    required: bool
+    priority: int
+    conditions: tuple[tuple[str, bool], ...]
+    steps: tuple[Step, ...]
+
+
+@dataclass(frozen=True)
 class Recipe:
     """A validated, offline task description."""
 
@@ -117,6 +161,8 @@ class Recipe:
     contract_hash: str
     scopes: tuple[str, ...]
     steps: tuple[Step, ...]
+    facts: Mapping[str, FactSpec] = field(default_factory=dict)
+    branches: tuple[BranchSpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -150,6 +196,31 @@ class PlanStep:
     scopes: tuple[str, ...]
     params: Mapping[str, Any]
     idempotency_key: str
+    branch_id: str | None = None
+    branch_index: int | None = None
+
+
+@dataclass(frozen=True)
+class PlanFact:
+    """A compiled fact projection over a main step's measured positions."""
+
+    name: str
+    from_step: str
+    index: int
+    at_least_rad: float | None
+    at_most_rad: float | None
+
+
+@dataclass(frozen=True)
+class PlanBranch:
+    """A compiled declared branch with its own step keys."""
+
+    id: str
+    after: str
+    required: bool
+    priority: int
+    conditions: tuple[tuple[str, bool], ...]
+    steps: tuple[PlanStep, ...]
 
 
 @dataclass(frozen=True)
@@ -162,6 +233,8 @@ class Plan:
     contract_hash: str
     required_scopes: tuple[str, ...]
     steps: tuple[PlanStep, ...]
+    facts: Mapping[str, PlanFact] = field(default_factory=dict)
+    branches: tuple[PlanBranch, ...] = ()
 
 
 def canonical_json(value: Any) -> str:
@@ -488,8 +561,8 @@ def _check_params(kind: str, params: Mapping[str, Any], scopes: tuple[str, ...],
         )
 
 
-def _parse_step(value: Any, index: int) -> Step:
-    where = f"steps[{index}]"
+def _parse_step(value: Any, index: int, *, where_prefix: str = "steps") -> Step:
+    where = f"{where_prefix}[{index}]"
     step = _mapping(value, where)
     _exact_keys(step, _STEP_KEYS, where)
     name = _name(step["name"], f"{where}.name")
@@ -519,11 +592,161 @@ def _parse_step(value: Any, index: int) -> Step:
     )
 
 
+def _nonnegative_int(value: Any, where: str, *, maximum: int | None = None) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        _fail(where, "must be an integer")
+    if value < 0:
+        _fail(where, "must not be negative")
+    if maximum is not None and value > maximum:
+        _fail(where, f"must not exceed {maximum}")
+    return value
+
+
+def _optional_keys(
+    value: Mapping[str, Any],
+    *,
+    required: frozenset[str],
+    allowed: frozenset[str],
+    where: str,
+) -> None:
+    missing = sorted(required - set(value))
+    extra = sorted(set(value) - allowed)
+    if missing:
+        _fail(where, f"missing field(s): {', '.join(missing)}")
+    if extra:
+        _fail(where, f"unknown field(s): {', '.join(extra)}")
+
+
+def _parse_facts(value: Any, source: str) -> dict[str, FactSpec]:
+    root = _mapping(value, f"{source}.facts")
+    if not root:
+        _fail(f"{source}.facts", "must not be empty when present")
+    facts: dict[str, FactSpec] = {}
+    for name, item in root.items():
+        if not isinstance(name, str) or not re.fullmatch(
+            r"[a-z0-9][a-z0-9_-]{0,63}", name
+        ):
+            _fail(f"{source}.facts", f"invalid fact name {name!r}")
+        where = f"{source}.facts[{name}]"
+        fact = _mapping(item, where)
+        _exact_keys(fact, _FACT_KEYS, where)
+        from_step = _name(fact["from_step"], f"{where}.from_step")
+        measured = _mapping(fact["measured"], f"{where}.measured")
+        _optional_keys(
+            measured,
+            required=frozenset({"index"}),
+            allowed=_MEASURED_KEYS,
+            where=f"{where}.measured",
+        )
+        index = _nonnegative_int(measured["index"], f"{where}.measured.index")
+        at_least = (
+            _finite_number(measured["at_least_rad"], f"{where}.measured.at_least_rad")
+            if "at_least_rad" in measured
+            else None
+        )
+        at_most = (
+            _finite_number(measured["at_most_rad"], f"{where}.measured.at_most_rad")
+            if "at_most_rad" in measured
+            else None
+        )
+        if at_least is None and at_most is None:
+            _fail(
+                f"{where}.measured",
+                "requires at_least_rad and/or at_most_rad",
+            )
+        if at_least is not None and at_most is not None and at_least > at_most:
+            _fail(f"{where}.measured", "at_least_rad must not exceed at_most_rad")
+        facts[name] = FactSpec(
+            name=name,
+            from_step=from_step,
+            index=index,
+            at_least_rad=at_least,
+            at_most_rad=at_most,
+        )
+    return facts
+
+
+def _parse_branches(value: Any, source: str) -> tuple[BranchSpec, ...]:
+    raw = value
+    if not isinstance(raw, list):
+        _fail(f"{source}.branches", "must be a list")
+    if not raw:
+        _fail(f"{source}.branches", "must not be empty when present")
+    branches: list[BranchSpec] = []
+    ids: set[str] = set()
+    for index, item in enumerate(raw):
+        where = f"{source}.branches[{index}]"
+        branch = _mapping(item, where)
+        _optional_keys(
+            branch,
+            required=frozenset({"id", "after", "when", "steps"}),
+            allowed=_BRANCH_KEYS,
+            where=where,
+        )
+        branch_id = _text(branch["id"], f"{where}.id")
+        if not _BRANCH_ID_RE.fullmatch(branch_id):
+            _fail(f"{where}.id", "must match ^[a-z0-9][a-z0-9.-]{0,63}$")
+        if branch_id in ids:
+            _fail(f"{where}.id", f"duplicate branch id {branch_id!r}")
+        ids.add(branch_id)
+        after = _name(branch["after"], f"{where}.after")
+        required = (
+            _bool(branch["required"], f"{where}.required")
+            if "required" in branch
+            else False
+        )
+        priority = (
+            _nonnegative_int(branch["priority"], f"{where}.priority", maximum=100)
+            if "priority" in branch
+            else 0
+        )
+        raw_when = branch["when"]
+        if not isinstance(raw_when, list) or not raw_when:
+            _fail(f"{where}.when", "must be a non-empty list")
+        conditions: list[tuple[str, bool]] = []
+        seen_facts: set[str] = set()
+        for condition_index, condition_value in enumerate(raw_when):
+            condition_where = f"{where}.when[{condition_index}]"
+            condition = _mapping(condition_value, condition_where)
+            _exact_keys(condition, _CONDITION_KEYS, condition_where)
+            fact = _text(condition["fact"], f"{condition_where}.fact")
+            if fact in seen_facts:
+                _fail(f"{condition_where}.fact", f"duplicate condition {fact!r}")
+            seen_facts.add(fact)
+            equals = _bool(condition["equals"], f"{condition_where}.equals")
+            conditions.append((fact, equals))
+        raw_steps = branch["steps"]
+        if not isinstance(raw_steps, list):
+            _fail(f"{where}.steps", "must be a list")
+        if not 1 <= len(raw_steps) <= MAX_STEPS:
+            _fail(f"{where}.steps", f"must contain 1 to {MAX_STEPS} steps")
+        steps = tuple(
+            _parse_step(step, step_index, where_prefix=f"{where}.steps")
+            for step_index, step in enumerate(raw_steps)
+        )
+        branches.append(
+            BranchSpec(
+                id=branch_id,
+                after=after,
+                required=required,
+                priority=priority,
+                conditions=tuple(conditions),
+                steps=steps,
+            )
+        )
+    return tuple(branches)
+
+
 def recipe_from_mapping(value: Any, *, source: str = "<mapping>") -> Recipe:
     """Validate a mapping and return a :class:`Recipe`."""
 
     recipe = _mapping(value, source)
-    _exact_keys(recipe, _TOP_LEVEL_KEYS, source)
+    _optional_keys(
+        recipe,
+        required=_REQUIRED_TOP_LEVEL_KEYS,
+        allowed=_TOP_LEVEL_KEYS,
+        where=source,
+    )
     name = _name(recipe["name"], f"{source}.name")
     version = _text(recipe["version"], f"{source}.version")
     if not _SEMVER_RE.fullmatch(version):
@@ -552,13 +775,56 @@ def recipe_from_mapping(value: Any, *, source: str = "<mapping>") -> Recipe:
     if not 1 <= len(raw_steps) <= MAX_STEPS:
         _fail(f"{source}.steps", f"must contain 1 to {MAX_STEPS} steps")
     steps = tuple(_parse_step(item, index) for index, item in enumerate(raw_steps))
-    names = [step.name for step in steps]
-    if len(set(names)) != len(names):
+    facts = _parse_facts(recipe["facts"], source) if "facts" in recipe else {}
+    branches = (
+        _parse_branches(recipe["branches"], source) if "branches" in recipe else ()
+    )
+
+    main_names = [step.name for step in steps]
+    if len(set(main_names)) != len(main_names):
         _fail(f"{source}.steps", "step names must be unique")
+    all_names = main_names + [
+        step.name for branch in branches for step in branch.steps
+    ]
+    if len(set(all_names)) != len(all_names):
+        _fail(
+            f"{source}.branches",
+            "step names must be unique across the main plan and every branch",
+        )
+    main_index = {step.name: index for index, step in enumerate(steps)}
+
+    for fact_name, fact in facts.items():
+        if fact.from_step not in main_index:
+            _fail(
+                f"{source}.facts[{fact_name}].from_step",
+                "must name a main step",
+            )
+    for branch in branches:
+        if branch.after not in main_index:
+            _fail(
+                f"{source}.branches[{branch.id}].after",
+                "must name a main step",
+            )
+        anchor_index = main_index[branch.after]
+        for fact_name, _equals in branch.conditions:
+            if fact_name not in facts:
+                _fail(
+                    f"{source}.branches[{branch.id}].when",
+                    f"unknown fact {fact_name!r}",
+                )
+            source_index = main_index[facts[fact_name].from_step]
+            if source_index > anchor_index:
+                _fail(
+                    f"{source}.branches[{branch.id}].when",
+                    f"fact {fact_name!r} is measured after the anchor step",
+                )
 
     step_scopes: set[str] = set()
     for step in steps:
         step_scopes.update(step.scopes)
+    for branch in branches:
+        for step in branch.steps:
+            step_scopes.update(step.scopes)
     if step_scopes != set(scopes):
         _fail(
             f"{source}.scopes",
@@ -573,6 +839,8 @@ def recipe_from_mapping(value: Any, *, source: str = "<mapping>") -> Recipe:
         contract_hash=contract_hash,
         scopes=scopes,
         steps=steps,
+        facts=facts,
+        branches=branches,
     )
 
 
@@ -636,6 +904,56 @@ def build_plan(recipe: Recipe, run_id: str) -> Plan:
             )
         )
 
+    facts = {
+        name: PlanFact(
+            name=name,
+            from_step=fact.from_step,
+            index=fact.index,
+            at_least_rad=fact.at_least_rad,
+            at_most_rad=fact.at_most_rad,
+        )
+        for name, fact in recipe.facts.items()
+    }
+    plan_branches = []
+    next_index = len(plan_steps)
+    for branch in recipe.branches:
+        branch_steps = []
+        for branch_index, step in enumerate(branch.steps):
+            payload = {
+                "run_id": run_id,
+                "branch_id": branch.id,
+                "branch_index": branch_index,
+                "name": step.name,
+                "kind": step.kind,
+                "profile": step.profile,
+                "params": step.params,
+            }
+            key = sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+            branch_steps.append(
+                PlanStep(
+                    index=next_index,
+                    name=step.name,
+                    kind=step.kind,
+                    profile=step.profile,
+                    scopes=step.scopes,
+                    params=dict(step.params),
+                    idempotency_key=key,
+                    branch_id=branch.id,
+                    branch_index=branch_index,
+                )
+            )
+            next_index += 1
+        plan_branches.append(
+            PlanBranch(
+                id=branch.id,
+                after=branch.after,
+                required=branch.required,
+                priority=branch.priority,
+                conditions=branch.conditions,
+                steps=tuple(branch_steps),
+            )
+        )
+
     return Plan(
         run_id=run_id,
         recipe_name=recipe.name,
@@ -643,6 +961,8 @@ def build_plan(recipe: Recipe, run_id: str) -> Plan:
         contract_hash=recipe.contract_hash,
         required_scopes=recipe.scopes,
         steps=tuple(plan_steps),
+        facts=facts,
+        branches=tuple(plan_branches),
     )
 
 
