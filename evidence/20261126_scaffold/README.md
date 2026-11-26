@@ -11,7 +11,7 @@
 | Item | Value |
 |---|---|
 | Repository | `JCHENG-Robotics/jcheng-applications` (public, created 2026-11-26) |
-| Initial commit | pending first push |
+| Initial commit | `da140ae` (`chore: initialize jcheng-applications repository`) |
 | Operator host | operator laptop, Linux x86_64, Python 3.12.3, pytest 7.4.4 |
 | CI host | `ubuntu-latest`, Python 3.12, pytest 8.3.4, PyYAML 6.0.2 |
 | Robot | not used |
@@ -28,7 +28,7 @@
 | Manifest schema validation against `capability-manifest.v1.schema.json` | pass | `gate.txt` |
 | `jcheng-applications validate recipes/example-supervised-transfer.yaml` | pass | `gate.txt` |
 | `jcheng-applications plan recipes/example-supervised-transfer.yaml --run-id evidence-001` | pass | `gate.txt` |
-| CI `applications-gate` | pending first push | — |
+| CI `applications-gate` | pass ([run 45738303645](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45738303645)) | [`job applications-gate`](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45738303645/job/139636803830) |
 
 ## 3. Claims supported
 

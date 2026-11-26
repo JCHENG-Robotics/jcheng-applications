@@ -105,7 +105,7 @@ against an in-process fake gateway in the tests.
 
 | Claim | Status | Evidence |
 |---|---|---|
-| Repository gate, document set and unit tests pass | Verified (L0/L1, 2026-11-26) | `evidence/20261126_scaffold/`; `scripts/check_repo_gate.sh` |
+| Repository gate, document set and unit tests pass | Verified (L0/L1, 2026-11-26) | `evidence/20261126_scaffold/`; [CI run 45738303645](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45738303645) |
 | Recipes are validated against the pinned contract, scopes and per-kind payload rules | Verified (L1, 2026-11-26) | `tests/test_recipe.py` |
 | Plans are deterministic and idempotency keys are run-bound | Verified (L1, 2026-11-26) | `tests/test_recipe.py`; `src/jcheng_applications/model.py` |
 | The runner refuses missing authorization, scope gaps, a contract mismatch, a non-`ARMED_IDLE` safety state and a missing lease before submitting anything | Verified (L2, 2026-11-26) | `tests/test_runner.py` |

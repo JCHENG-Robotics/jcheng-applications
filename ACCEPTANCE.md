@@ -1,10 +1,10 @@
 # Acceptance report — jcheng-applications
 
-> Status: **inconclusive** as of 2026-11-26 for v0.1.0.
+> Status: **pass** as of 2026-11-26 for v0.1.0.
 > Operator: JerichoCheng. Reviewer: pending.
 > Scope: the repository scaffold, the offline orchestration core and its
-> mock-gateway tests. The local gate and tests pass; the first CI run is
-> recorded in `evidence/20261126_scaffold/` after the initial push.
+> mock-gateway tests. The local gate, 89 tests and CI `applications-gate` pass
+> on `da140ae`.
 > No gateway is contacted, no intent is submitted to a real system and no
 > device is opened. No hardware claim is made.
 
@@ -16,7 +16,7 @@
 | Unit tests | `python3 -m pytest -q` | L1 | pass (89 tests, local, 2026-11-26) | `tests/` |
 | Offline runner against a fake gateway | `python3 -m pytest -q tests/test_runner.py` | L2 | pass (local, 2026-11-26) | `tests/test_runner.py` |
 | CLI validate/plan | `jcheng-applications validate` / `plan` | L1 | pass (local, 2026-11-26) | `tests/test_cli.py` |
-| CI | `.github/workflows/ci.yml` job `applications-gate` | L0/L1/L2 | pending first run | `evidence/20261126_scaffold/README.md` |
+| CI | `.github/workflows/ci.yml` job `applications-gate` | L0/L1/L2 | pass ([run 45738303645](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45738303645)) | `evidence/20261126_scaffold/README.md` |
 | Mock end-to-end through a gateway process | — | L3 | not applicable (no transport) | — |
 | Replay of a recorded run | — | L4 | not applicable (no persisted run) | — |
 | Hardware | — | L5 | not applicable; no hardware session authorized | — |
