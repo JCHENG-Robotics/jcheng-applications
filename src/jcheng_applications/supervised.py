@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .core.preflight import PreflightRefusal
+from .derived import validate_derived_plan
 from .gateway import GatewayProtocolError
 from .lease import LeaseSession
 from .model import Authorization, Recipe, build_plan
@@ -28,6 +29,7 @@ class SupervisedResult:
     renewals: int
     lease_error: str | None
     release_error: str | None
+    derived_from: str | None = None
 
 
 def _lease_scope(recipe: Recipe) -> str:
@@ -51,6 +53,7 @@ def run_supervised(
     engine: str = "linear",
     deadline_s: float | None = None,
     clock: Callable[[], datetime] | None = None,
+    derived_from: str | None = None,
 ) -> SupervisedResult:
     """Acquire a lease, run the recipe, release the lease and persist the report.
 
@@ -69,6 +72,15 @@ def run_supervised(
         raise ValueError("deadline_s requires the tree engine")
     if deadline_s is not None and deadline_s <= 0:
         raise ValueError("deadline_s must be positive")
+
+    if derived_from is not None:
+        validate_derived_plan(
+            recipe=recipe,
+            authorization=authorization,
+            run_id=run_id,
+            derived_from=derived_from,
+            store=store,
+        )
 
     tree_run = None
     if engine == "tree":
@@ -137,6 +149,7 @@ def run_supervised(
             evidence_class=evidence_class,
             lease_ref=lease_ref,
             lease_released=released,
+            derived_from=derived_from,
         )
     except Exception as exc:  # noqa: BLE001 - keep the report, flag the evidence failure
         record_path = None
@@ -150,4 +163,5 @@ def run_supervised(
         renewals=session.renewals,
         lease_error=session.error,
         release_error=session.release_error,
+        derived_from=derived_from,
     )

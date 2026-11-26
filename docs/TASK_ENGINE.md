@@ -396,11 +396,19 @@ declare. It is not a runtime recovery; it is a new run.
 
 | Rule | Enforcement |
 |---|---|
-| New recipe revision (different `version`) when parameters change | Compiler records and compares versions; evidence keeps the predecessor run id |
-| New `run_id` | Keys differ; no key reuse |
-| New `Authorization` with a new `session_id` and `approved_at` | Preflight refuses a reused record |
-| No mutation of a live plan | The tree is halted and rebuilt; the old process exits |
-| Operator initiated, never automatic | No code path from a failure handler to a new compile |
+| Predecessor record exists and its chain verifies | `RunStore.load_started`; a tampered/missing record is refused |
+| Same recipe name | `derived.validate_derived_plan` compares `recipe_name` |
+| New recipe revision (different `version`) when parameters change | `validate_derived_plan` refuses an equal version |
+| New `run_id` | `validate_derived_plan` refuses the predecessor run id |
+| New `Authorization` with a new `session_id` | `validate_derived_plan` refuses a reused session id |
+| No mutation of a live plan | The guard runs before any lease/submission; the old process exits |
+| Operator initiated, never automatic | `run --derived-from <run-id>`; no code path from a failure handler to a new compile |
+
+The guard runs before `check_mock`, lease acquisition and any gateway call; a
+refusal raises `DerivedPlanError` (a `ValueError`) and the CLI exits 2 with no
+submission. The derived `run_started` record carries `derived_from`; the
+predecessor record is untouched. Verified: `tests/test_derived.py`,
+`evidence/20261126_derived_plan/`.
 
 ## 9. Strategy selection and guards
 
@@ -649,7 +657,7 @@ There is no application-layer workaround for a gateway defect.
 | Branch scopes are part of the recipe union and must be authorized | **Verified L1**: scope-union test |
 | Selector is three-valued, deterministic and cannot read execution outcomes | **Verified L1/L2**: guard table, no-branch-on-failure test |
 | No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | **Verified as a terminal state**: both engines set `operator_required`, stop once and exit 3; a live handover channel is not implemented |
-| Derived Plan requires a new version, run id and authorization | **Documented only**: no run registry enforces predecessor identity |
+| Derived Plan requires a new version, run id and authorization | **Verified L1/L2**: `tests/test_derived.py`; predecessor chain must verify; refusal precedes any gateway call |
 | Proposal artifact accepts only `params`/`skill`, requires a hash and is recorded | **Not implemented** |
 | Everything above runs against a mock gateway only | **Verified L3**: real system mock gateway + `MockStack`, no robot; both engines execute the same branch plan with exact report parity |
 
@@ -845,6 +853,7 @@ result.
 - [`../evidence/20261126_s3_branches/`](../evidence/20261126_s3_branches/README.md) — S3 v0 linear-engine L3 evidence.
 - [`../evidence/20261126_s3_tree/`](../evidence/20261126_s3_tree/README.md) — S3 tree-engine L3 and branch parity evidence.
 - [`../evidence/20261126_waiting/`](../evidence/20261126_waiting/README.md) — WAITING_FOR_OPERATOR evidence.
+- [`../evidence/20261126_derived_plan/`](../evidence/20261126_derived_plan/README.md) — Derived Plan identity guard evidence.
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.

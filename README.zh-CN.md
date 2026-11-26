@@ -78,6 +78,7 @@ jcheng-applications/
 ├── evidence/20261126_s3_branches/  # S3 声明分支线性 L3 证据
 ├── evidence/20261126_s3_tree/      # S3 树分支 L3 与对齐证据
 ├── evidence/20261126_waiting/      # WAITING_FOR_OPERATOR 证据
+├── evidence/20261126_derived_plan/ # Derived Plan 身份校验证据
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -137,6 +138,8 @@ bash scripts/check_repo_gate.sh
 在仓库外。`check` 只读健康、契约、状态与安全。任何命令都不打开设备、不加入
 DDS，也不自行执行运动。退出码：0 `SUCCEEDED`，1 `FAILED`/`ABORTED`，2 用法或
 记录写入失败，**3 `WAITING_FOR_OPERATOR`**（无运动权限，需检查并重新授权）。
+`run --derived-from <run-id>` 要求前序记录可验证，并且 recipe 版本、run id 与
+授权会话全部更新；不满足时在任何网关调用前拒绝。
 
 ## 验证状态
 
@@ -153,6 +156,7 @@ DDS，也不自行执行运动。退出码：0 `SUCCEEDED`，1 `FAILED`/`ABORTED
 | 可选 py_trees 引擎 + 独立 deadline/cancel/stop 监督器 | 已验证（L2/L3，2026-11-26） | `tests/test_tree_runtime.py`；`evidence/20261126_m1_5_tree/`；py_trees 非默认；许可证审查未关闭 |
 | 声明分支 + 位置索引 arm 事实 + 三值选择器（两个引擎） | 已验证（L1–L3，2026-11-26） | `tests/test_branches.py`；`tests/test_tree_branches.py`；`evidence/20261126_s3_branches/`、`evidence/20261126_s3_tree/`；命名/gripper 事实待补 |
 | 终态 `WAITING_FOR_OPERATOR`：`operator_required` + CLI 退出码 3，无运动权限 | 已验证（L2，2026-11-26） | `tests/test_waiting.py`；`evidence/20261126_waiting/`；实时接管通道未实现 |
+| Derived Plan 身份：前序记录校验、新 recipe 版本、新 run id、新授权会话，且在任何网关调用前拒绝 | 已验证（L1/L2，2026-11-26） | `tests/test_derived.py`；`evidence/20261126_derived_plan/` |
 | 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
 | 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
 | 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |

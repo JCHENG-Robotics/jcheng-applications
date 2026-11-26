@@ -178,6 +178,7 @@ class RunStore:
         evidence_class: str,
         lease_ref: str | None = None,
         lease_released: bool | None = None,
+        derived_from: str | None = None,
     ) -> Path:
         path = self.path_for(run_id)
         self.append(
@@ -194,6 +195,7 @@ class RunStore:
                 "session_id": report.session_id,
                 "evidence_class": evidence_class,
                 "lease_ref": lease_ref,
+                "derived_from": derived_from,
             },
         )
         for step in report.steps:
@@ -215,6 +217,25 @@ class RunStore:
         payload["lease_released"] = lease_released
         self.append(run_id, "run_finished", payload)
         return path
+
+    def load_started(self, run_id: str) -> dict[str, Any] | None:
+        """Return the verified ``run_started`` payload, or None.
+
+        A predecessor whose chain does not verify is treated as missing; a
+        derived plan must not build on an edited record.
+        """
+
+        path = self.path_for(run_id)
+        if not path.exists() or not self.verify(run_id):
+            return None
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            if not raw.strip():
+                continue
+            record = json.loads(raw)
+            if record.get("kind") == "run_started":
+                payload = record.get("payload")
+                return payload if isinstance(payload, dict) else None
+        return None
 
     def verify(self, run_id: str) -> bool:
         path = self.path_for(run_id)

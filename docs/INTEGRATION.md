@@ -40,6 +40,7 @@ is no second path: no SSH, no vendor SDK, no ROS topic, no serial device.
 |---|---|
 | Base URL | Operator configuration; no address is hard-coded or committed |
 | Authentication | `Authorization: Bearer <token>` per the gateway OpenAPI; the token is read from operator configuration and never enters git |
+| Derived Plan | `run --derived-from <run-id>` reads the predecessor record from the same store and requires a new recipe version, run id and authorization session before any gateway call |
 | Health | `GET /v1/health` is unauthenticated liveness; it carries no motion authority |
 | Contract | `GET /v1/contract` returns `ContractInfo`; a hash or range mismatch refuses the run |
 | Safety | `GET /v1/safety` returns `SafetyState`; a run requires `ARMED_IDLE` and no stop latch |
