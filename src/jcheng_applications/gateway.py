@@ -35,6 +35,14 @@ class GatewayProtocolError(GatewayError):
     """The gateway answered with a payload that violates the contract."""
 
 
+class GatewayUnauthorized(GatewayError):
+    """The gateway rejected the credential; there is no retry loop."""
+
+
+class GatewayContractMismatch(GatewayProtocolError):
+    """The deployed contract is outside the pinned range or hash."""
+
+
 @dataclass(frozen=True)
 class ContractInfo:
     """The deployed contract identity returned by ``GET /v1/contract``."""

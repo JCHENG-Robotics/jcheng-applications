@@ -39,6 +39,9 @@ The review must decide before the ecosystem reaches v1.0:
 | Python standard library | code | PSF | Low |
 | PyYAML | recipe parsing | MIT | Low |
 | pytest | tests only | MIT | Low |
+| `py_trees` 2.6.0 (M1.5 candidate) | tree runtime for the task engine, not a v0.1.0 or runtime dependency | BSD-3-Clause | Low; tested in an isolated venv, wheel `78155ffa…89837` |
+| `pydot` (transitive of py_trees) | graph rendering only; not used by the tick path | MIT | Low; pin before adoption. 4.0.1 resolved in the probe |
+| `pyparsing` (transitive of pydot) | parser used by pydot | MIT | Low |
 | HTTP/WS client (TBD at M2) | gateway transport | TBD | Decide before adoption |
 | Recipe files | operator-authored intent sequences | Organization decision | Decide before accepting third-party recipes |
 
@@ -47,6 +50,11 @@ The review must decide before the ecosystem reaches v1.0:
 - [ ] Confirm the copyright holder and year.
 - [ ] Confirm the intended license for application repositories.
 - [ ] Decide whether recipe files are code or data.
+- [ ] Decide whether `py_trees` 2.6.0 (BSD-3) is approved as the M1.5 tree
+      runtime and whether a notice is required. It declares `pydot>=1.4`;
+      pydot and pyparsing must be locked with it.
+- [ ] Confirm that pydot 4.x is acceptable for py_trees 2.6 rendering; the
+      tick path does not use it and rendering compatibility is untested.
 - [ ] Decide the notice requirement for the M2 HTTP/WS client.
 - [ ] Record the ecosystem-wide decision in `.github/docs/license-review.md`.
 
