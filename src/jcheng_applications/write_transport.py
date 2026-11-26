@@ -32,7 +32,9 @@ from .gateway import (
     GatewayUnavailable,
     MotionResult,
     SafetySnapshot,
+    StopReceipt,
     motion_result_from_mapping,
+    stop_receipt_from_mapping,
 )
 from .model import CONTRACT_VERSION, SCOPES
 from .transport import (
@@ -159,15 +161,13 @@ class HttpGateway:
         )
         return motion_result_from_mapping(payload)
 
-    def stop(self, reason: str) -> None:
+    def stop(self, reason: str) -> StopReceipt:
         payload = self._request(
             "POST",
             "/v1/motion/stop",
             {"operator_id": self._operator_id, "reason": reason},
         )
-        accepted = payload.get("accepted")
-        if accepted is not True:
-            raise GatewayProtocolError("stop: gateway did not accept the request")
+        return stop_receipt_from_mapping(payload)
 
     # ---- one bounded request ----
 

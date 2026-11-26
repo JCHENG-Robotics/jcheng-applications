@@ -1,0 +1,23 @@
+{
+  "derived_from": null,
+  "lease_error": null,
+  "lease_released": true,
+  "operator_reason": null,
+  "operator_required": false,
+  "physical_stop": "unverified",
+  "record": "/tmp/stop-receipt-runs/stop-receipt-l3.jsonl",
+  "record_error": null,
+  "release_error": null,
+  "renewals": 0,
+  "run_id": "stop-receipt-l3",
+  "state": "FAILED",
+  "steps": [
+    {
+      "index": 0,
+      "name": "approach",
+      "outcome": "REJECTED",
+      "reason_code": "INVALID_COMMAND"
+    }
+  ],
+  "stop_confirmation": "request_accepted"
+}

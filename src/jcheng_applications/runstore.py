@@ -109,6 +109,8 @@ def _report_payload(report: Any) -> dict[str, Any]:
         ],
         "abort_reason": report.abort_reason,
         "stop_error": report.stop_error,
+        "stop_confirmation": report.stop_confirmation,
+        "physical_stop": report.physical_stop,
         "operator_required": report.operator_required,
         "operator_reason": report.operator_reason,
         "selections": [
@@ -133,10 +135,11 @@ def _report_payload(report: Any) -> dict[str, Any]:
 class RunStore:
     """Write one hash-chained JSONL record set per run."""
 
-    def __init__(self, directory: str | Path) -> None:
+    def __init__(self, directory: str | Path, *, create: bool = True) -> None:
         self.directory = Path(directory).expanduser()
-        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(self.directory, 0o700)
+        if create:
+            self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            os.chmod(self.directory, 0o700)
         self._lock = RLock()
 
     def path_for(self, run_id: str) -> Path:
@@ -233,6 +236,26 @@ class RunStore:
                 continue
             record = json.loads(raw)
             if record.get("kind") == "run_started":
+                payload = record.get("payload")
+                return payload if isinstance(payload, dict) else None
+        return None
+
+    def load_finished(self, run_id: str) -> dict[str, Any] | None:
+        """Return the verified ``run_finished`` payload, or None.
+
+        A missing file, a broken chain or a record without a terminal entry
+        all return None; the caller uses ``verify`` to distinguish tampering
+        from an incomplete run.
+        """
+
+        path = self.path_for(run_id)
+        if not path.exists() or not self.verify(run_id):
+            return None
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            if not raw.strip():
+                continue
+            record = json.loads(raw)
+            if record.get("kind") == "run_finished":
                 payload = record.get("payload")
                 return payload if isinstance(payload, dict) else None
         return None

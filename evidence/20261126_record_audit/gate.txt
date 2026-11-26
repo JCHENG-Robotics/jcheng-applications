@@ -1,0 +1,6 @@
+== tests
+........................................................................ [ 39%]
+.....................................................................s.s [ 78%]
+........................................                                 [100%]
+182 passed, 5 skipped in 18.19s
+Repository gate OK: document set, manifest, no LICENSE, no secrets, no weights, no run data, links resolve

@@ -1,10 +1,11 @@
-"""CLI: validate, plan, check admission or run one supervised recipe.
+"""CLI: validate, plan, check admission, run or audit one recipe.
 
 ``validate`` and ``plan`` are offline. ``check`` performs the M2 read-only
 admission (GET only). ``run`` performs M3 supervised execution against a
 gateway that advertises the ``mock`` capability; it refuses anything else.
 ``run`` submits motion and requires an explicit operator ``Authorization``
-record.
+record. ``verify`` audits one persisted run record: it is read-only, makes no
+network call and does not create the store directory.
 """
 
 from __future__ import annotations
@@ -115,6 +116,17 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="run deadline; tree engine only",
     )
+
+    verify = subparsers.add_parser(
+        "verify",
+        help="verify a run record's hash chain and print its terminal summary",
+    )
+    verify.add_argument("run_id")
+    verify.add_argument(
+        "--store-dir",
+        default="~/.local/state/jcheng-applications/runs",
+        help="read-only run record directory; it is not created",
+    )
     return parser
 
 
@@ -185,6 +197,8 @@ def _run(args: argparse.Namespace) -> int:
                 "state": result.report.state.value,
                 "operator_required": result.report.operator_required,
                 "operator_reason": result.report.operator_reason,
+                "stop_confirmation": result.report.stop_confirmation,
+                "physical_stop": result.report.physical_stop,
                 "steps": [
                     {
                         "index": step.index,
@@ -224,6 +238,82 @@ def _run(args: argparse.Namespace) -> int:
     return 0 if result.report.state is RunState.SUCCEEDED else 1
 
 
+def _verify(args: argparse.Namespace) -> int:
+    store = RunStore(Path(args.store_dir).expanduser(), create=False)
+    try:
+        path = store.path_for(args.run_id)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    if not path.exists():
+        print(
+            json.dumps(
+                {
+                    "run_id": args.run_id,
+                    "record": str(path),
+                    "verified": False,
+                    "complete": False,
+                    "error": "record not found",
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        print(f"error: no record for run {args.run_id!r}", file=sys.stderr)
+        return 1
+
+    try:
+        chain_ok = store.verify(args.run_id)
+        finished = store.load_finished(args.run_id) if chain_ok else None
+        started = store.load_started(args.run_id) if chain_ok else None
+    except (OSError, UnicodeError, ValueError):
+        # A record that cannot be parsed is a chain failure, not a usage error.
+        chain_ok = False
+        finished = None
+        started = None
+    steps = finished.get("steps") if finished else None
+    if not isinstance(steps, list):
+        steps = []
+    result: dict[str, object] = {
+        "run_id": args.run_id,
+        "record": str(path),
+        "verified": chain_ok,
+        "complete": finished is not None,
+        "recipe_name": (started or {}).get("recipe_name"),
+        "recipe_version": (started or {}).get("recipe_version"),
+        "evidence_class": (started or {}).get("evidence_class"),
+        "derived_from": (started or {}).get("derived_from"),
+        "state": finished.get("state") if finished else None,
+        "abort_reason": finished.get("abort_reason") if finished else None,
+        "stop_error": finished.get("stop_error") if finished else None,
+        "stop_confirmation": finished.get("stop_confirmation") if finished else None,
+        "physical_stop": finished.get("physical_stop") if finished else None,
+        "operator_required": finished.get("operator_required") if finished else None,
+        "operator_reason": finished.get("operator_reason") if finished else None,
+        "report_hash": finished.get("report_hash") if finished else None,
+        "steps": [
+            {
+                "index": step.get("index"),
+                "name": step.get("name"),
+                "outcome": step.get("outcome"),
+                "reason_code": step.get("reason_code"),
+                "bus_verified": step.get("bus_verified"),
+            }
+            for step in steps
+            if isinstance(step, dict)
+        ],
+    }
+    print(json.dumps(result, indent=2, sort_keys=True))
+    if not chain_ok:
+        print("error: record hash chain does not verify", file=sys.stderr)
+        return 1
+    if finished is None:
+        print("error: record has no terminal run_finished entry", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -231,6 +321,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check(args)
         if args.command == "run":
             return _run(args)
+        if args.command == "verify":
+            return _verify(args)
         recipe = load_recipe(args.recipe)
         if args.command == "validate":
             print(

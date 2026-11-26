@@ -1,0 +1,27 @@
+{
+  "abort_reason": "rejected",
+  "complete": true,
+  "derived_from": null,
+  "evidence_class": "L2",
+  "operator_reason": null,
+  "operator_required": false,
+  "physical_stop": "unverified",
+  "recipe_name": "example-declared-branch",
+  "recipe_version": "0.2.0",
+  "record": "/tmp/audit-sample/audit-sample.jsonl",
+  "report_hash": "sample-digest",
+  "run_id": "audit-sample",
+  "state": "FAILED",
+  "steps": [
+    {
+      "bus_verified": false,
+      "index": 0,
+      "name": "approach",
+      "outcome": "REJECTED",
+      "reason_code": "LIMIT_VIOLATION"
+    }
+  ],
+  "stop_confirmation": "request_accepted",
+  "stop_error": null,
+  "verified": true
+}

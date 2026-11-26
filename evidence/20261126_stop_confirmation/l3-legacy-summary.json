@@ -1,0 +1,16 @@
+{
+  "operator_required": false,
+  "physical_stop": "unverified",
+  "record_error": null,
+  "run_id": "stop-receipt-l3",
+  "state": "FAILED",
+  "steps": [
+    {
+      "name": "approach",
+      "outcome": "REJECTED",
+      "reason_code": "INVALID_COMMAND"
+    }
+  ],
+  "stop_confirmation": "request_accepted",
+  "stop_error": null
+}

@@ -85,6 +85,8 @@ class _Probe:
         self.execute_delay_s = 0.0
         self.safety_state = "ARMED_IDLE"
         self.stop_status: int | None = None
+        self.stop_confirmation: str | None = None
+        self.stop_physical_stop: str | None = None
         self.lock = Lock()
 
     def record(self, method: str, path: str, headers: dict[str, str], body: Any) -> None:
@@ -177,15 +179,17 @@ class _Handler(BaseHTTPRequestHandler):
             if probe.stop_status is not None:
                 self._send(probe.stop_status, {"error": {"code": "TEST"}})
                 return
-            self._send(
-                200,
-                {
-                    "accepted": True,
-                    "safety": safety_payload(probe.safety_state),
-                    "message": "software stop requested",
-                    "requested_at": NOW,
-                },
-            )
+            response = {
+                "accepted": True,
+                "safety": safety_payload(probe.safety_state),
+                "message": "software stop requested",
+                "requested_at": NOW,
+            }
+            if probe.stop_confirmation is not None:
+                response["confirmation"] = probe.stop_confirmation
+            if probe.stop_physical_stop is not None:
+                response["physical_stop"] = probe.stop_physical_stop
+            self._send(200, response)
             return
         self._send(404, {"error": {"code": "NOT_FOUND"}})
 

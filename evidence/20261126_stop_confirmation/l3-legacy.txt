@@ -1,0 +1,32 @@
+L3 legacy stop-receipt compatibility check — 2026-11-26
+=======================================================
+
+Environment
+- Real `jcheng_system_core` gateway process on 127.0.0.1:18767.
+- MockStack only; no robot, DDS, SSH or device access.
+- The operator armed the mock gateway through its HTTP API with the checklist
+  confirmation phrase. No physical motion is claimed.
+
+Command shape
+- Recipe: `recipes/example-supervised-transfer.yaml` (its first JOINT_STEP is
+  multi-joint, which the system profile rejects with INVALID_COMMAND).
+- The app therefore requests exactly one stop after the rejected submission.
+- Current system `StopResponse`: `{accepted: true, safety, message,
+  requested_at}`; it does not carry the R5 fields yet.
+
+Observed
+- CLI exit: 1 (clean FAILED, no operator wait).
+- State: FAILED; one step REJECTED / INVALID_COMMAND.
+- Lease released: true; record_error: null.
+- stop_error: null.
+- stop_confirmation: request_accepted (S1).
+- physical_stop: unverified.
+- Record: hash chain verifies; mode 0o600; 2340 bytes at the external store
+  `/tmp/stop-receipt-runs/stop-receipt-l3.jsonl` (not committed).
+
+Interpretation
+- The legacy response is recorded as S1 only; the client does not infer S2 from
+  HTTP 200, `accepted` or the safety latch.
+- S2 remains unproven on the system gateway until R5 is approved and the
+  gateway emits `confirmation: backend_confirmed`.
+- No physical stop is claimed.

@@ -8,6 +8,27 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- Stop confirmation receipt (client-side, forward-compatible with the open R5
+  contract proposal): `HttpGateway.stop` returns a `StopReceipt`. Missing R5
+  fields are S1 `request_accepted`; S2 is recorded only for an explicit
+  `confirmation: backend_confirmed`; `physical_stop` is limited to `unverified`.
+  Both engines store `RunReport.stop_confirmation` / `physical_stop`, the run
+  record and CLI persist them, and a failed stop leaves both `None` with
+  `stop_error` set. No schema, tag or contract hash changed.
+- `tests/test_stop_confirmation.py`: receipt parsing, invalid-field refusal, and
+  S1/S2/failure/no-stop behaviour on the linear and tree engines.
+- `jcheng-applications verify <run-id> --store-dir <dir>`: read-only record
+  audit. It verifies the hash chain, requires a terminal `run_finished` entry
+  and prints state, steps and stop confirmation levels. Exit 0 means the record
+  verifies and is complete, not that the run succeeded; 1 covers
+  missing/tampered/incomplete; 2 is usage. It makes no network call and does
+  not create the store (`RunStore(create=False)`).
+- `tests/test_audit.py`: complete, stop-level, tampered, unparseable,
+  incomplete, missing and unsafe-id cases.
+- L3 legacy compatibility check: the real `jcheng_system_core` mock gateway
+  returns a `StopResponse` without R5 fields after a rejected step; the app
+  records `request_accepted` / `unverified`, releases the lease and verifies the
+  hash chain. Evidence: `evidence/20261126_stop_confirmation/`.
 - Derived Plan identity guard: `run --derived-from <run-id>` requires a
   hash-chain-verified predecessor record, the same recipe name, a new recipe
   version, a new run id and a new authorization session. The guard runs before
