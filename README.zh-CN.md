@@ -53,7 +53,8 @@ jcheng-applications/
 │   ├── model.py                    # 配方模型、契约常量与规划器
 │   ├── gateway.py                  # GatewayPort 协议与契约解析
 │   ├── transport.py                # M2 只读 GET 传输（不提交意图）
-│   ├── runner.py                   # 失败关闭运行器与运行报告
+│   ├── core/                       # 共享预检、命令、分类、提交与 stop-once
+│   ├── runner.py                   # 基于共享核心的失败关闭运行器
 │   └── cli.py                      # validate/plan 与只读 check 命令行
 ├── tests/                          # 契约、配方、网关、运行器与 CLI 测试
 ├── scripts/check_repo_gate.sh      # 仓库门禁（本地与 CI）
@@ -116,7 +117,8 @@ bash scripts/check_repo_gate.sh
 | 运行器在提交任何内容前拒绝缺失授权、作用域不足、契约不匹配、非 `ARMED_IDLE` 安全状态与缺失租约 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
 | 被拒绝、中止、超时或未实测的步骤会停止运行，且绝不重试 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
 | 仓库中不存在硬件、DDS 或运动执行路径；网络访问只允许 GET-only 的 `transport.py` | 已验证（L0，2026-11-26） | `tests/test_no_hardware.py` |
-| 只读网关准入：四项 GET、有界超时、不重试、拒绝契约/鉴权/格式错误 | 部分验证（L2，2026-11-26） | `tests/test_transport.py`；仅回环 mock；CI 待跑 |
+| 只读网关准入：四项 GET、有界超时、不重试、拒绝契约/鉴权/格式错误 | 已验证（L2，2026-11-26） | `tests/test_transport.py`；`evidence/20261126_m2_transport/`；[CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
+| Shared Execution Core；线性与树驱动共用同一分类器 | 部分验证（L2，2026-11-26） | `tests/test_core.py`；M1.5 M15-K 11 例差分；`evidence/20261126_shared_core/`；完整 `RunReport` 对齐待补 |
 | 向真实网关提交意图 | 未验证；M3 暂停 | `jcheng-system` C2 失败 |
 | 持久化运行记录与操作员会话关联 | 未验证 | 尚未实现（M2） |
 | 任何硬件行为 | 未验证 | 无 L5 会话；无运行时 |

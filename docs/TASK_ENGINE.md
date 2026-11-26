@@ -6,10 +6,11 @@
 > answers it.
 >
 > **Implementation is partial.** M2's read-only transport is in
-> `src/jcheng_applications/transport.py`; M1.5's isolated py_trees probe and
-> report are in `scripts/m1_5_pytrees_probe.py` and
-> [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md). The tree runtime, Run Supervisor,
-> branches and selection are **not** implemented.
+> `src/jcheng_applications/transport.py`; the Shared Execution Core is in
+> `src/jcheng_applications/core/` and `runner.py` delegates to it; the M1.5
+> probe and report are in `scripts/m1_5_pytrees_probe.py` and
+> [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md). The production tree runtime, Run
+> Supervisor, branches and selection are **not** implemented.
 >
 > M2 remains the mainline. M1.5 is a parallel, isolated validation and must not
 > delay M2. **M3 is unblocked on the mock**: the system-side C2/C5/C5b revision
@@ -107,12 +108,13 @@ concurrency probes in §15 are a gate for M3, not a post-hoc check.
 
 ## 5. Execution Core
 
-The shared core is the target, not the M1.5 starting point. Until M2's contract
-settles and M1.5's differential harness passes, `runner.py` stays untouched:
-M1.5 validates an isolated tree driver against the linear runner's golden
-trace. The extraction then lands as **one** refactor, so authorization, lease,
-safety, submission and failure handling have a single implementation and cannot
-drift. The regression gate for that refactor is T-C06 (§16).
+The shared core is extracted. M2 is merged and the M1.5 differential passed, so
+`runner.py` now delegates to `core/` while keeping its public API and the 89
+v0.1.0 tests unchanged. The linear runner and the M1.5 tree driver call the
+same `StepExecutor` and `classify`; authorization, lease, safety, submission
+and failure handling have one implementation and cannot drift. T-C06 is
+partially verified: the 11-case behavioural differential passes, while the full
+`RunReport` object is not yet compared.
 
 ```text
 core/
@@ -566,22 +568,23 @@ separate authorization per session.
 
 | Exit criterion | Evidence |
 |---|---|
-| `runner.py` is untouched; the existing 89 v0.1.0 tests pass unchanged | existing `tests/` |
+| Shared core extracted; `runner.py` delegates with an unchanged public API; the existing 89 v0.1.0 tests pass | `src/jcheng_applications/core/`; `tests/test_core.py`; existing `tests/` |
 | `py_trees` 2.6 runs in a disposable venv: non-blocking `RUNNING`, `terminate(INVALID)`, sequence memory, single worker | [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md); `evidence/20261126_m1_5_pytrees/probe.json` |
 | Nominal gateway-call parity with the linear runner: same sequence, parameters, idempotency keys and zero stops | M15-I |
 | Late future, hung worker and stop race are non-success and latch | M15-E/F/G |
 | Run Supervisor thread with its own state machine, latch, deadline, stop-once and evidence | probe-level M15-J; the production supervisor is not implemented; T-S01–T-S10 |
-| Failure-path differential (call log + stop + report semantics) | 11-case probe differential M15-K; full `RunReport` parity and post-extraction regression remain T-C06 |
+| Failure-path differential (call log + stop + report semantics) | 11-case shared-core differential M15-K; T-C06 partially verified, full `RunReport` object pending |
 | No transport dependency is added; `capability.yaml` unchanged | `pyproject.toml`; static scan |
 | Repository gate and CI `applications-gate` pass | `bash scripts/check_repo_gate.sh` |
 
-Progress 2026-11-26: M15-A–K pass in isolation, including an independent
-supervisor thread (M15-J) and an 11-case failure differential against the
-unmodified linear runner (M15-K). Those are **probe-level** mechanics: the
-production tree runtime and Run Supervisor are not built, the differential uses
-a temporary decision mirror, and full `RunReport` parity remains T-C06. M1.5 is
-In progress, not Complete. It does not prove gateway behaviour, concurrency,
-lease, stop, physical safety or post-extraction parity.
+Progress 2026-11-26: M15-A–K pass, including an independent supervisor thread
+(M15-J) and an 11-case failure differential (M15-K). The Shared Execution Core
+is extracted; both the linear runner and the tree driver call it, and
+`runner.py`'s public API is unchanged. The production tree runtime and Run
+Supervisor are still not built, and T-C06 compares behavioural fields rather
+than the full `RunReport` object. M1.5 is In progress, not Complete. It does not
+prove gateway behaviour, concurrency, lease, stop, physical safety or full
+report parity.
 
 ### M2 — read-only gateway client (mainline)
 
@@ -657,7 +660,7 @@ State is `Planned` for every row; this document does not claim a pass.
 | T-C03 | At most one stop request per run, including stop failure | Stop-once | L2 |
 | T-C04 | Exhaustive classification table (outcome × `bus_verified` × scope) | No decision gap | L1 |
 | T-C05 | Golden idempotency keys for v0.1.0 recipes | Key stability for existing plans | L1 |
-| T-C06 | **Shared Core regression** (after extraction): linear and tree runners produce identical call logs, stop behaviour and reports for the full matrix; the existing 89 tests pass unchanged | The refactor changed no behaviour | L2 |
+| T-C06 | **Shared Core regression** (after extraction): linear and tree runners produce identical call logs, stop behaviour and step reports for the 11-case matrix; the existing 89 tests pass unchanged. **Partially verified 2026-11-26**: the full `RunReport` object is not yet compared | The refactor changed no behaviour | L2 |
 
 ### 16.3 Differential (tree vs linear)
 
@@ -758,7 +761,7 @@ result.
 | K2 | A wedged HTTP call blocks process exit and leaves an orphan motion | High | Mandatory connect/read timeouts; single worker; bounded drain; supervisor-owned stop | M2 / M3 |
 | K3 | Branch selection becomes a de-facto retry | High | Guards read only verified facts; execution outcomes are not in the selector's input type; T-G03 | S3 |
 | K4 | Branch scopes silently widen the authorized surface | Medium | Branch scopes join the recipe union; plan rejected if not covered; T-G04 | S3 |
-| K5 | Two executors drift after the refactor | Medium | One extraction after M2 is stable; T-C06 compares full call logs, stops and reports; the linear runner is then an oracle only | T-C06 |
+| K5 | Two executors drift after the refactor | Medium | The single extraction is done; T-C06 compares call logs, stops and step reports across 11 cases; the full report object is still pending | T-C06 |
 | K6 | Lease TTL is shorter than a long motion | High | Renewal on the supervisor thread at `ttl/3`; if renewal cannot happen during `execute`, the gateway lease contract is reviewed | M3 |
 | K7 | `py_trees` semantics misused (status memory, `terminate`, blackboard) | Medium | Pin 2.6; wrap in `tree/`; leaf tests; no custom composite subclasses. M15-A–I validate the needed subset | M1.5 |
 | K8 | Evidence leaks a token or operator data | Medium | Field allowlist, `lease_id` hashed, `0600`, outside git, gate scan | M1.5 |
@@ -788,9 +791,10 @@ result.
 6. **`measured_positions` stability.** Are joint names and units stable across
    robot profiles, and is `profile_hash` sufficient to bind a fact projection?
    Owner: `jcheng-system` / `jcheng-interfaces`.
-7. **Merge order (resolved 2026-11-26).** M2 added `transport.py` without
-   touching `runner.py`; M1.5 is isolated in `scripts/` and `docs/`. No overlap
-   remains; the extraction is a later single refactor (T-C06).
+7. **Merge order (resolved 2026-11-26).** M2 landed `transport.py`; the
+   Shared Execution Core extraction landed afterwards as one refactor.
+   T-C06 is partially verified; the full `RunReport` comparison is the
+   remaining piece.
 
 ## 19. Related
 

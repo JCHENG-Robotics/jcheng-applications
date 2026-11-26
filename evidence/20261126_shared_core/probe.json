@@ -1,0 +1,158 @@
+{
+  "generated_at": "2026-11-26T11:31:31+0800",
+  "python": "3.12.3",
+  "runtime": "py_trees (candidate, isolated; not a repository dependency)",
+  "runner_modified": false,
+  "shared_core_extracted": false,
+  "checks": [
+    {
+      "id": "M15-A",
+      "name": "candidate metadata and transitive dependency",
+      "status": "PASS",
+      "observed": {
+        "version": "2.6.0",
+        "license": "BSD-3-Clause",
+        "requires_dist": [
+          "pydot>=1.4"
+        ]
+      },
+      "detail": "pydot is a transitive runtime dependency and enters the license review"
+    },
+    {
+      "id": "M15-B",
+      "name": "non-blocking RUNNING leaf",
+      "status": "PASS",
+      "observed": {
+        "final_status": "SUCCESS",
+        "ticks": 16,
+        "initialise_count": 1,
+        "max_tick_gap_s": 0.0202,
+        "elapsed_s": 0.3023
+      }
+    },
+    {
+      "id": "M15-C",
+      "name": "sequence memory re-ticks only the running child",
+      "status": "PASS",
+      "observed": {
+        "final_status": "SUCCESS",
+        "first_initialise": 1,
+        "first_ticks": 4,
+        "second_ticks": 1,
+        "second_initialise": 1
+      }
+    },
+    {
+      "id": "M15-D",
+      "name": "stop calls terminate(INVALID) and drains the worker",
+      "status": "PASS",
+      "observed": {
+        "terminate_status": "INVALID"
+      }
+    },
+    {
+      "id": "M15-E",
+      "name": "late future after stop is not success",
+      "status": "PASS",
+      "observed": {
+        "late_flag": true,
+        "leaf_status": "INVALID",
+        "terminate_status": "INVALID",
+        "transport_terminal": "COMPLETED_AFTER_STOP",
+        "supervisor_terminal": "INDETERMINATE"
+      }
+    },
+    {
+      "id": "M15-F",
+      "name": "hung worker does not block the tick loop",
+      "status": "PASS",
+      "observed": {
+        "final_status": "RUNNING",
+        "elapsed_s": 0.302,
+        "ticks": 15,
+        "note": "the worker thread is daemon; a wedged real call still needs a transport timeout and process restart"
+      }
+    },
+    {
+      "id": "M15-G",
+      "name": "app-side stop race: late COMPLETED cannot advance the plan",
+      "status": "PASS",
+      "observed": {
+        "final_status": "FAILURE",
+        "late_flag": true,
+        "submissions": 1,
+        "transport_terminal": "COMPLETED_AFTER_STOP",
+        "claimed_run_state": "INDETERMINATE"
+      }
+    },
+    {
+      "id": "M15-H",
+      "name": "one worker means one in-flight submission",
+      "status": "PASS",
+      "observed": {
+        "peak_concurrency": 1
+      }
+    },
+    {
+      "id": "M15-I",
+      "name": "nominal gateway-call parity with the linear runner",
+      "status": "PASS",
+      "observed": {
+        "linear_submissions": 2,
+        "tree_submissions": 2,
+        "linear_keys": [
+          "bdc03247fd885058",
+          "4b1cfd365e9560cc"
+        ],
+        "tree_keys": [
+          "bdc03247fd885058",
+          "4b1cfd365e9560cc"
+        ],
+        "stop_calls": {
+          "linear": 0,
+          "tree": 0
+        }
+      },
+      "detail": "failure-path parity is covered by M15-K; full RunReport parity remains T-C06"
+    },
+    {
+      "id": "M15-J",
+      "name": "independent supervisor thread issues the stop on deadline",
+      "status": "PASS",
+      "observed": {
+        "final_status": "FAILURE",
+        "supervisor_latched": true,
+        "stop_calls": [
+          {
+            "reason": "deadline",
+            "thread": "m15-supervisor",
+            "error": null
+          }
+        ],
+        "supervisor_state_before_close": "WAITING_FOR_OPERATOR",
+        "late_flag": true,
+        "submissions": 1,
+        "supervisor_terminal": "INDETERMINATE"
+      }
+    },
+    {
+      "id": "M15-K",
+      "name": "failure-path differential: shared-core tree driver vs the linear runner",
+      "status": "PASS",
+      "observed": {
+        "cases": 11,
+        "failures": [],
+        "compared": [
+          "final state",
+          "submitted command sequence, parameters and idempotency keys",
+          "step outcome, reason code and bus verification",
+          "stop count and stop-error presence"
+        ],
+        "note": "both drivers call StepExecutor/classify; the linear runner was refactored to the same core (T-C06)"
+      }
+    }
+  ],
+  "summary": {
+    "PASS": 11
+  }
+}
