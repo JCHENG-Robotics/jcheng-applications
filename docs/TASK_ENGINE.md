@@ -7,16 +7,17 @@
 >
 > **Implementation is partial.** M2's read-only transport is in
 > `src/jcheng_applications/transport.py`; the Shared Execution Core is in
-> `src/jcheng_applications/core/` and `runner.py` delegates to it; the M1.5
-> probe and report are in `scripts/m1_5_pytrees_probe.py` and
-> [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md). The production tree runtime, Run
-> Supervisor, branches and selection are **not** implemented.
+> `src/jcheng_applications/core/`; M3's write path is in
+> `write_transport.py`, `lease.py`, `runstore.py` and `supervised.py`, with a
+> mock-only `run` CLI. The M1.5 probe and report are in
+> `scripts/m1_5_pytrees_probe.py` and [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md).
+> The production tree runtime, Run Supervisor, branches and selection are
+> **not** implemented.
 >
-> M2 remains the mainline. M1.5 is a parallel, isolated validation and must not
-> delay M2. **M3 is unblocked on the mock**: the system-side C2/C5/C5b revision
-> passed (R2 evidence in `jcheng-system/e2e/reports/20261126_concurrency_probe_r2/`);
-> M3 is still not implemented. The deployed gateway must repeat C1–C5 before
-> M4. No hardware execution is opened before M4, and every M4 session needs
+> M2 and M3 are implemented on the mock. M3's L3 evidence is
+> `evidence/20261126_m3_supervised/`: the real `jcheng-system` gateway process
+> with `MockStack`, no robot. The deployed gateway must still pass C1–C5 and
+> R5 before M4. No hardware execution is opened before M4, and every M4 session needs
 > separate, explicit operator authorization. Offline evidence and hardware
 > evidence are never mixed.
 
@@ -598,19 +599,20 @@ report parity.
 
 ### M3 — supervised execution of one recipe (mainline)
 
-| Exit criterion | Evidence |
+| Exit criterion | Status and evidence |
 |---|---|
-| Lease acquire/renew/release through the gateway, renewal independent of the tree tick | L3 mock |
-| One submission per step, stable keys, stop-once, cancellation and deadline | L3 mock |
-| The fake gateway models two concurrent connections; stop during a mock motion is issued while `execute` is pending and resolves the run | L3 mock (probe C2/C3) |
-| `UNKNOWN`/`TIMEOUT` blocks every later submission at the core, not only in the tree | L3 mock |
-| Persisted, hash-chained run record; mock label preserved | L3 |
-| Gateway concurrency evidence from `jcheng-system` is linked | L3; blocker for M4 |
+| Lease acquire/renew/release through the gateway, renewal independent of the step loop | **Verified L2/L3**: renewal and renewal-failure tests; L3 acquire/release |
+| One submission per step, stable keys, stop-once | **Verified L2/L3**: `tests/test_supervised.py`; L3 3/3 steps |
+| Stop during an in-flight execute resolves the run | **Verified system-side**: C2/C2p r2 evidence; the app-side M3 run is linear, not a concurrency harness |
+| `UNKNOWN`/`TIMEOUT` blocks every later submission at the core | **Verified L2**: classification and stop-once tests |
+| Persisted, hash-chained run record; mock label preserved | **Verified L3**: `evidence/20261126_m3_supervised/` |
+| Gateway concurrency evidence from `jcheng-system` is linked | **Verified**: C1–C5 r2 probes; deployed gateway still required for M4 |
+| Cancellation/deadline supervisor independent of the step loop | **Not implemented**: M1.5 production supervisor |
 
-**Unblocked on the mock (2026-11-26).** The first C2 probe failed; after the
-system-side R1–R4 revision, C1–C5, C5b and a 30-iteration stress loop pass.
-M3 may proceed against a mock gateway. The deployed gateway still has to pass
-the same probes before M4. There is no application-layer workaround.
+**Implemented on the mock (2026-11-26).** M3 acquires a lease, submits a
+single-joint recipe, releases the lease, stops on rejection and persists a
+hash-chained record. The deployed gateway still has to pass C1–C5 before M4.
+There is no application-layer workaround for a gateway defect.
 
 ### S3 — declared branches and selection (parallel after M3)
 

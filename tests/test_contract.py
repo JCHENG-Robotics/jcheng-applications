@@ -66,7 +66,7 @@ def test_version_matches_everywhere() -> None:
     assert version == __version__ == manifest["version"] == match.group(1) == "0.1.0"
 
 
-def test_manifest_is_admission_only() -> None:
+def test_manifest_matches_m3_admission() -> None:
     manifest = yaml.safe_load(
         (ROOT / "capability.yaml").read_text(encoding="utf-8")
     )
@@ -87,13 +87,14 @@ def test_manifest_is_admission_only() -> None:
         "system_api": SYSTEM_API_RANGE,
     }
     assert manifest["safety"] == {
-        "class": "offline",
-        "scopes": [],
+        "class": "motion_source",
+        "scopes": ["arm", "gripper"],
         "requires_lease": True,
         "max_rate_hz": 1,
         "deadman_ms": 500,
     }
     assert manifest["hardware_access"] == "none"
+    # A gateway intent source, not a DDS capability.
     assert manifest["runtime"] == {
         "ros_domains": [],
         "publishes": [],

@@ -1,15 +1,14 @@
 # Architecture — jcheng-applications
 
 > Status: **Experimental** as of 2026-11-26. Version 0.1.0.
-> v0.1.0 is an offline core: no runtime process, no DDS participant and no
-> device path. M2 adds one read-only transport in `transport.py`: GET only,
-> bounded timeouts, no submission, no stop and no lease mutation. The write
-> path is M3; it is unblocked on the mock after the C2 revision and is not
-> implemented.
+> The offline core, the M2 read-only transport and the M3 supervised write path
+> are implemented. There is no runtime process, no DDS participant and no
+> device path. `run` refuses a gateway that does not advertise `mock`; the
+> deployed gateway and hardware remain M4.
 >
-> The planned tree executor, shared Execution Core, Run Supervisor and strategy
-> selection are specified in [`TASK_ENGINE.md`](TASK_ENGINE.md). Design only:
-> none of them is implemented in v0.1.0.
+> The Shared Execution Core is extracted. The planned production tree executor,
+> Run Supervisor and strategy selection are specified in
+> [`TASK_ENGINE.md`](TASK_ENGINE.md); they are design/probe only.
 
 ## 1. Position in the ecosystem
 
@@ -24,8 +23,8 @@ operator / script
       ▼
 jcheng-applications core (operator laptop)
       │  Plan (deterministic, offline)
-      │  RunReport (in memory)
-      │  GatewayPort (M2: HTTP/WS)
+      │  RunReport + hash-chained record (outside the repo)
+      │  GatewayPort (M2 read / M3 lease+execute+stop, HTTP)
       ▼
 jcheng-system gateway
       │  contract, safety, lease, validation, stop latch
@@ -60,10 +59,14 @@ Rules that come from the ecosystem and are not negotiable here:
 | Planner | Operator laptop, in process | Produce a stable `Plan` with one idempotency key per step | I/O, network, time-dependent keys, hidden randomness |
 | Shared execution core | Operator laptop, in process | Preflight, command construction, one submission per step, terminal classification and stop-once, used by every driver | Retrying an indeterminate motion, inventing a result, widening authorization |
 | Runner | Operator laptop, in process | Authorize, preflight, submit one intent per step, map the terminal result, request one stop on failure | Retrying an indeterminate motion, inventing a result, widening authorization |
-| Gateway port | Operator laptop, abstract | The only path to the robot; M2 implements read-only reads over HTTP | Device, ROS, SSH or vendor-SDK access |
+| Gateway port | Operator laptop, abstract | The only path to the robot; M2 reads and M3 writes go through it | Device, ROS, SSH or vendor-SDK access |
 | Read-only transport (M2) | Operator laptop, in process | `GET /v1/health`, `/contract`, `/state` and `/safety` with bounded timeouts and strict parsing | POST, submission, stop, lease mutation, retry |
+| Write transport (M3) | Operator laptop, in process | Lease acquire/renew/release, one execute per step, one stop; refuses a non-mock gateway | Retry, redirect, non-mock submission, device access |
+| Lease session | Operator laptop, in process | Acquire before the first submission, renew at `ttl/3`, release on every terminal path | Holding safety authority; retrying a lost lease |
+| Run store | Operator laptop, file | Append-only, hash-chained JSONL outside the repository, mode 0600 | Tokens, raw lease ids, recordings in git |
+| Supervised run | Operator laptop, in process | Compose lease + runner + record for one recipe | Executing motion itself or bypassing the preflight |
 | Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code and intent identity per step | Relabelling a mock result as hardware, persisting secrets |
-| CLI | Operator laptop | Offline `validate` and `plan` only | A `run` command before M2 |
+| CLI | Operator laptop | `validate`, `plan`, read-only `check`, mock-only `run` | Non-mock `run`; device or DDS access |
 
 The presentation surface is deliberately absent. `jcheng-studio` owns the
 operator UI, the session record and the authorization interaction; this
@@ -128,7 +131,9 @@ submission is then rejected and the run fails closed.
 |---|---|
 | No hardware access | `capability.yaml`; `tests/test_no_hardware.py` |
 | No DDS domain, `rclpy`, `ros2` CLI or vendor topic | static scan; review of every transport change |
-| Network access confined to `transport.py`; M2 is GET-only | static scan; AST test `test_transport_is_get_only_and_has_no_motion_call` |
+| Network access confined to `transport.py` and `write_transport.py`; M2 is GET-only; M3 refuses non-mock gateways | static scan; AST test `test_transport_is_get_only_and_has_no_motion_call`; `check_mock` |
+| Lease acquired before the first submission and released on every terminal path | `LeaseSession`; `tests/test_supervised.py` |
+| The run record is append-only, hash-chained and outside the repository | `RunStore`; `verify.txt`; gate scan |
 | No direct motion execution | static scan; gateway-only boundary; system lease |
 | Deterministic plans | SHA-256 over run, index, name, kind, profile and canonical params |
 | One submission per step | the runner's loop; no retry path |
@@ -145,6 +150,9 @@ submission is then rejected and the run fails closed.
 | Contract hash or range mismatch | `ABORTED`; no fallback gateway |
 | Safety not `ARMED_IDLE` or stop latched | `ABORTED`; nothing submitted |
 | Missing lease reference | `ABORTED`; nothing submitted |
+| Gateway does not advertise `mock` | Refused before a lease or submission |
+| Lease acquisition fails | `run` exits non-zero; nothing submitted |
+| Lease renewal fails during the run | One stop; later submissions are blocked; the run cannot succeed |
 | Gateway unreachable at preflight | `ABORTED`; nothing submitted |
 | Gateway unreachable during a submission | `INDETERMINATE`; one stop request; no retry |
 | `REJECTED` terminal result | `FAILED`; one stop request |

@@ -3,12 +3,11 @@
 **English** | [简体中文](README.zh-CN.md)
 
 > Status: **Experimental** as of 2026-11-26. Version 0.1.0.
-> Admission plus an offline task-orchestration core: recipe validation,
-> deterministic planning and a fail-closed runner over an abstract gateway
-> port. M2 adds one read-only transport (GET only, bounded timeouts, no
-> retry); no intent is submitted and there is no runtime process. M3 is
-> unblocked on the mock after the system-side C2 revision passed; it is not
-> implemented. Nothing here is used by the running robot.
+> Admission plus a task-orchestration core: recipe validation, deterministic
+> planning, a fail-closed runner over an abstract gateway port, an M2 read-only
+> transport and an M3 supervised `run` against a mock gateway. The shared
+> execution core is extracted; the M1.5 tree runtime is probe-only. No hardware
+> is used and nothing here runs on the robot.
 > English canonical; the Chinese README is a translation.
 
 `jcheng-applications` is the L4 task-orchestration application of the JCHENG
@@ -25,8 +24,8 @@ proposes one step at a time and reports what the gateway answered.
 |---|---|
 | Layer | L4 task orchestration (see the [repository taxonomy](https://github.com/JCHENG-Robotics/.github/blob/main/docs/repo-taxonomy.md)) |
 | Runs on | Operator laptop or workstation; never on the robot |
-| Inputs | Recipe YAML, an explicit per-session `Authorization` record, and gateway `ContractInfo` / `SafetySnapshot` / `MotionResult` values (M2/M3) |
-| Outputs | A deterministic `Plan` with stable idempotency keys, and an in-memory `RunReport`; gateway intent requests from M3; persisted run records from M3 |
+| Inputs | Recipe YAML, an explicit per-session `Authorization` record, and gateway `ContractInfo` / `SafetySnapshot` / `MotionResult` values |
+| Outputs | A deterministic `Plan` with stable idempotency keys; a `RunReport`; gateway intent requests; a hash-chained run record outside the repository (M3) |
 | Motion authority | None. The system layer owns the control lease, deadman, limits, stop latch and motion execution |
 | Hardware access | `none` |
 | Owned devices | none |
@@ -34,6 +33,9 @@ proposes one step at a time and reports what the gateway answered.
 
 The division of authority is structural, not a coding convention:
 
+- M3 acquires a **client lease reference** through the gateway before the first
+  submission and releases it on every terminal path. The system layer owns the
+  lease, may revoke it at any time, and remains the only origin of motion.
 - A recipe is a request for a sequence of intents, not a program with direct
   access to a device.
 - The runner submits at most one intent per step and never retries. A timeout,
@@ -62,14 +64,19 @@ jcheng-applications/
 │   ├── model.py                    # recipe model, contract constants and planner
 │   ├── gateway.py                  # GatewayPort protocol and contract parsers
 │   ├── transport.py                # M2 read-only GET transport (no submission)
+│   ├── write_transport.py          # M3 lease/execute/stop transport (mock-only)
+│   ├── lease.py                    # lease acquire, renew, release
+│   ├── runstore.py                 # hash-chained run records outside the repo
+│   ├── supervised.py               # lease + runner + persisted report
 │   ├── core/                       # shared preflight, command, classify, executor, stop-once
 │   ├── runner.py                   # fail-closed runner over the shared core
-│   └── cli.py                      # validate/plan plus read-only check CLI
-├── tests/                          # contract, recipe, gateway, runner and CLI tests
+│   └── cli.py                      # validate/plan/check/run CLI
+├── tests/                          # contract, recipe, transport, lease and supervised-run tests
 ├── scripts/check_repo_gate.sh      # repository gate (local and CI)
 ├── scripts/m1_5_pytrees_probe.py   # isolated candidate-runtime probe (not a runtime dependency)
 ├── evidence/20261126_scaffold/     # M0/M1 evidence record
 ├── evidence/20261126_m1_5_pytrees/ # M1.5 isolated probe evidence
+├── evidence/20261126_m3_supervised/# M3 L3 supervised-run evidence
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -83,13 +90,14 @@ jcheng-applications/
   license review. v0.1.0 does not import it and it is not a dependency yet.
 - No ROS installation, now or later: this repository joins no DDS graph and
   uses no RMW. The gateway is an HTTP/WS boundary.
-- The M2 transport uses the standard library `http.client`; no third-party
-  HTTP dependency is added. It is GET-only and has bounded timeouts.
+- The two transports use the standard library `http.client`; no third-party
+  HTTP dependency is added. The M2 adapter is GET-only; the M3 adapter submits
+  only to a gateway that advertises the `mock` capability.
 - The gate makes no network request. Transport tests bind an ephemeral
   loopback port; no robot, gateway or network listener is required.
-- A `jcheng-system` gateway and an operator-authorized session are required for
-  any execution (M3). M3 is unblocked on the mock but not implemented; the M2
-  `check` command reads only.
+- `run` requires a `jcheng-system` gateway, an operator-supplied
+  `Authorization` JSON and the gateway token in the environment. It refuses a
+  non-mock gateway and writes its record outside the repository.
 
 ## Quick start
 
@@ -111,16 +119,26 @@ export JCHENG_GATEWAY_URL=http://127.0.0.1:8766
 export JCHENG_GATEWAY_TOKEN=...   # set by the operator; never commit it
 jcheng-applications check --url "$JCHENG_GATEWAY_URL"
 
+# M3 supervised run: mock gateway only. The recipe must use single-joint
+# JOINT_STEP commands; the system profile accepts one joint per step.
+jcheng-applications run path/to/m3-recipe.yaml \
+  --authorization /path/to/authorization.json \
+  --run-id demo-002 \
+  --url http://127.0.0.1:18766 \
+  --store-dir ~/.local/state/jcheng-applications/runs \
+  --evidence-class L3
+
 # CI equivalent.
 python3 -m pytest -q
 bash scripts/check_repo_gate.sh
 ```
 
-There is deliberately **no `run` command**. `check` reads health, contract,
-state and safety and nothing else. A command that appeared to run without the
-M2/M3 gateway path and a passing C2 would invite a hardware claim this
-repository cannot support. The runner is exercised against an in-process fake
-gateway in the tests.
+`run` is the only command that submits motion, and it is mock-only: it refuses
+a gateway whose health does not advertise `mock`, requires an explicit
+`Authorization` record, acquires and releases a client lease, and persists a
+hash-chained record outside the repository. `check` reads health, contract,
+state and safety and nothing else. No command opens a device, joins DDS or
+executes motion itself.
 
 ## Validation status
 
@@ -131,11 +149,12 @@ gateway in the tests.
 | Plans are deterministic and idempotency keys are run-bound | Verified (L1, 2026-11-26) | `tests/test_recipe.py`; `src/jcheng_applications/model.py` |
 | The runner refuses missing authorization, scope gaps, a contract mismatch, a non-`ARMED_IDLE` safety state and a missing lease before submitting anything | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
 | A rejected, aborted, timed-out or unverified step stops the run and is never retried | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
-| No hardware, DDS or motion-execution path exists; network access is confined to the GET-only `transport.py` | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py` |
+| No hardware, DDS or motion-execution path exists; network access is confined to `transport.py` and `write_transport.py`, and the write path refuses non-mock gateways | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py`; `tests/test_supervised.py` |
 | Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | Shared Execution Core; linear and tree drivers use the same classifier | Partially verified (L2, 2026-11-26) | `tests/test_core.py`; M1.5 M15-K 11-case differential; `evidence/20261126_shared_core/`; full `RunReport` parity pending |
-| Intent submission to a real gateway | Unverified; M3 not implemented | C2/C5/C5b pass on the mock (r2); M3 unblocked |
-| Persisted run records and operator session linkage | Unverified | Not implemented (M2) |
+| Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
+| Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
+| Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |
 | Any hardware behavior | Unverified | No L5 session; no runtime |
 
 Full report: [ACCEPTANCE.md](ACCEPTANCE.md).

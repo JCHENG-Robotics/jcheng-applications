@@ -1,0 +1,17 @@
+{
+  "lease_error": null,
+  "lease_released": true,
+  "record": "/tmp/m3-runs/m3-e2e-001.jsonl",
+  "release_error": null,
+  "renewals": 0,
+  "run_id": "m3-e2e-001",
+  "state": "FAILED",
+  "steps": [
+    {
+      "index": 0,
+      "name": "approach",
+      "outcome": "REJECTED",
+      "reason_code": "INVALID_COMMAND"
+    }
+  ]
+}

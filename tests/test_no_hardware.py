@@ -1,9 +1,10 @@
 """Static boundary check: no hardware, DDS, network or motion execution.
 
 Only executable and declarative sources are scanned; documentation may name
-the robot and the boundaries. The package is ROS-free. From M2 a single
-read-only adapter, ``transport.py``, may import ``http.client``; every other
-source file must stay transport-free, and the adapter itself must be GET-only.
+the robot and the boundaries. The package is ROS-free. Two adapters may
+import ``http.client``: the M2 read-only ``transport.py`` and the M3
+``write_transport.py``. Every other source file stays transport-free; the
+read-only adapter is GET-only and the write adapter refuses non-mock gateways.
 """
 
 from __future__ import annotations
@@ -54,7 +55,11 @@ FORBIDDEN = (
 )
 
 TRANSPORT = Path("src/jcheng_applications/transport.py")
-TOKEN_ALLOWLIST = {TRANSPORT: {"http.client"}}
+WRITE_TRANSPORT = Path("src/jcheng_applications/write_transport.py")
+TOKEN_ALLOWLIST = {
+    TRANSPORT: {"http.client"},
+    WRITE_TRANSPORT: {"http.client"},
+}
 
 ARTIFACT_SUFFIXES = {
     ".pt",
