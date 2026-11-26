@@ -1,0 +1,64 @@
+{
+  "run_finished": {
+    "abort_reason": null,
+    "contract_hash": "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42",
+    "finished_at": "2026-11-26T06:07:55.775253+00:00",
+    "lease_released": true,
+    "operator": "operator",
+    "recipe_name": "m3-e2e",
+    "recipe_version": "0.1.0",
+    "report_hash": "d1db80e551409a3ff7c4494240949927d3184de9c4fd5dfc71d16917fc9a7247",
+    "run_id": "m3-e2e-004",
+    "session_id": "m3-e2e",
+    "started_at": "2026-11-26T06:07:55.771672+00:00",
+    "state": "SUCCEEDED",
+    "steps": [
+      {
+        "bus_verified": true,
+        "idempotency_key": "c36f76f5a56c30cd7fc315f8b619e0f1cd1f7b8379b207eb6095d0b30a072387",
+        "index": 0,
+        "intent_id": "app-c36f76f5a56c30cd7fc315f8",
+        "message": "motion completed with bus verification",
+        "name": "approach-j1",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      },
+      {
+        "bus_verified": true,
+        "idempotency_key": "57bfe93465a3cd9330f8e300b0eee66521deb5b2b66e2e6f62f7c589977ef982",
+        "index": 1,
+        "intent_id": "app-57bfe93465a3cd9330f8e300",
+        "message": "motion completed with bus verification",
+        "name": "approach-j2",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      },
+      {
+        "bus_verified": true,
+        "idempotency_key": "9772cdaa424be520fd9b411e48a9fc95a4bcc6b55df0f1562f58c1e6f4d1843d",
+        "index": 2,
+        "intent_id": "app-9772cdaa424be520fd9b411e",
+        "message": "motion completed with bus verification",
+        "name": "grasp",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      }
+    ],
+    "stop_error": null
+  },
+  "run_started": {
+    "contract_hash": "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42",
+    "evidence_class": "L3",
+    "lease_ref": "4d6a45cd37fb434a77b7ff959f5446ce83dc7985336959d78d06446e5e05f6ba",
+    "operator": "operator",
+    "plan_hash": "592d3112f5fefbd32be8a13a7ff6ce1654a2e3937da5b3a81d9851f085c869f3",
+    "recipe_hash": "edf5eb0a80001aa04e243c89ba1164af8a8acbcb2a00401d4331acb7a2cfcddc",
+    "recipe_name": "m3-e2e",
+    "recipe_version": "0.1.0",
+    "run_id": "m3-e2e-004",
+    "session_id": "m3-e2e"
+  }
+}

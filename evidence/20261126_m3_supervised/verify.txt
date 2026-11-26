@@ -1,3 +1,5 @@
+# Raw records are kept outside the repository in /tmp/m3-runs.
+# RunStore.verify() re-read each chain and checked the file mode.
 m3-e2e-001 verify: True mode: 0o600
 m3-e2e-002 verify: True mode: 0o600
 m3-e2e-004 verify: True mode: 0o600

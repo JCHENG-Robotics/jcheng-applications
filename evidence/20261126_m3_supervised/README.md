@@ -40,15 +40,15 @@ JCHENG_GATEWAY_TOKEN=... PYTHONPATH=src python3 -m jcheng_applications run \
 | `m3-e2e-004` | `SUCCEEDED`, 3/3 `COMPLETED` | Lease acquired, three steps submitted with stable keys, lease released, record persisted; `record_error: null` |
 
 `m3-e2e-004` CLI output: [`cli-success.json`](cli-success.json).
-Record: [`record-success.jsonl`](record-success.jsonl).
-Rejected run: [`cli-rejected.json`](cli-rejected.json),
-[`record-rejected.jsonl`](record-rejected.jsonl).
-Preflight refusal: [`record-preflight-aborted.jsonl`](record-preflight-aborted.jsonl).
+Sanitized report payload: [`report-summary.json`](report-summary.json).
+Rejected run: [`cli-rejected.json`](cli-rejected.json).
+
+The raw JSONL records stay outside the repository (`/tmp/m3-runs`): the
+repository gate rejects `*.jsonl` so run data cannot enter git. `verify.txt`
+records the external chain check; the committed summary carries the
+`run_started` and `run_finished` payloads without a raw lease id.
 
 ### 2.1 Record verification
-
-`verify.txt` re-reads the three records: every chain verifies and every file is
-mode `0600`:
 
 ```text
 m3-e2e-001 verify: True mode: 0o600
