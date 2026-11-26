@@ -68,8 +68,9 @@ failure, and strict `measured_positions` parsing.
 - Facts use a **positional index** into `MotionResult.measured_positions`. The
   v0.1 gateway contract does not carry joint names or a gripper measurement, so
   a `gripper_closed` fact is not implementable without a contract change.
-  `docs/RECIPES.md` records the constraint; a proposal is being filed in
-  `jcheng-interfaces`.
+  `docs/RECIPES.md` records the constraint; the proposal is
+  `jcheng-interfaces/docs/proposals/measured-facts-named.md` (branch
+  `docs/measured-facts-proposal-20261126`).
 - The tree engine does not execute declared branches yet.
 - `required` with no candidate is `ABORTED` + one stop, not a live
   `WAITING_FOR_OPERATOR` state. The supervisor-owned wait is a later stage.

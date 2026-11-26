@@ -807,7 +807,8 @@ result.
 3. **Recipe format review (partially answered).** `facts`/`branches` are
    implemented with positional arm facts and structured conditions (S3 v0).
    Named-joint and gripper facts need a `jcheng-interfaces` change; the
-   proposal is in that repository. Owner: `jcheng-interfaces`.
+   proposal is `docs/proposals/measured-facts-named.md` in that repository.
+   Owner: `jcheng-interfaces`.
 4. **Operator channel.** Is `WAITING_FOR_OPERATOR` only a process state with a
    non-zero exit, or does `jcheng-studio` need a live channel? The latter is a
    contract review item. Owner: `jcheng-studio`.
