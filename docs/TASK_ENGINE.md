@@ -9,15 +9,16 @@
 > `src/jcheng_applications/transport.py`; the Shared Execution Core is in
 > `src/jcheng_applications/core/`; M3's write path is in
 > `write_transport.py`, `lease.py`, `runstore.py` and `supervised.py`, with a
-> mock-only `run` CLI. The M1.5 probe and report are in
+> mock-only `run` CLI. The M1.5 production tree engine and independent Run
+> Supervisor are in `src/jcheng_applications/tree/` as the opt-in
+> `--engine tree`; the default is still linear. The probe and report are in
 > `scripts/m1_5_pytrees_probe.py` and [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md).
-> The production tree runtime, Run Supervisor, branches and selection are
-> **not** implemented.
+> Declared branches and strategy selection are **not** implemented.
 >
-> M2 and M3 are implemented on the mock. M3's L3 evidence is
-> `evidence/20261126_m3_supervised/`: the real `jcheng-system` gateway process
-> with `MockStack`, no robot. The deployed gateway must still pass C1–C5 and
-> R5 before M4. No hardware execution is opened before M4, and every M4 session needs
+> M2, M3 and the M1.5 tree engine are implemented on the mock. L3 evidence:
+> `evidence/20261126_m3_supervised/` and `evidence/20261126_m1_5_tree/` (real
+> `jcheng-system` gateway process + `MockStack`, no robot). The deployed
+> gateway must still pass C1–C5 and R5 before M4. No hardware execution is opened before M4, and every M4 session needs
 > separate, explicit operator authorization. Offline evidence and hardware
 > evidence are never mixed.
 
@@ -161,14 +162,15 @@ tree as the differential oracle. It is not a second production path after M3.
 
 ## 6. Tree runtime and non-blocking leaves
 
-`py_trees` 2.6 (BSD-3, pure Python, no ROS) is the candidate runtime. It is
-imported by `tree/` only; the rest of the package does not depend on it. It is
-**not** dependency-free: it declares `pydot>=1.4` (the 2026-11-26 probe
-resolved pydot 4.0.1 plus pyparsing). pydot is used for rendering, not ticking,
-and must be locked with it. If the dependency is rejected at review, the
-fallback is a small internal runtime with the same leaf protocol — not
-BehaviorTree.CPP, which is C++ with no official Python bindings and would put a
-second toolchain in an HTTP-only L4 repository.
+`py_trees` 2.6 (BSD-3, pure Python, no ROS) is implemented as the opt-in tree
+engine. It is imported by `tree/runtime.py` only; the default linear engine and
+the gate do not import it. It is **not** dependency-free: it declares
+`pydot>=1.4` (the 2026-11-26 probe resolved pydot 4.0.1 plus pyparsing). The
+`tree` extra pins all three; the licence review is open and the engine is not
+the default. If the dependency is rejected at review, the fallback is a small
+internal runtime with the same leaf protocol — not BehaviorTree.CPP, which is
+C++ with no official Python bindings and would put a second toolchain in an
+HTTP-only L4 repository.
 
 Tick rate: 20 Hz nominal, monotonic clock, bounded jitter. A tick never blocks
 on the network.
@@ -573,19 +575,19 @@ separate authorization per session.
 | `py_trees` 2.6 runs in a disposable venv: non-blocking `RUNNING`, `terminate(INVALID)`, sequence memory, single worker | [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md); `evidence/20261126_m1_5_pytrees/probe.json` |
 | Nominal gateway-call parity with the linear runner: same sequence, parameters, idempotency keys and zero stops | M15-I |
 | Late future, hung worker and stop race are non-success and latch | M15-E/F/G |
-| Run Supervisor thread with its own state machine, latch, deadline, stop-once and evidence | probe-level M15-J; the production supervisor is not implemented; T-S01–T-S10 |
-| Failure-path differential (call log + stop + report semantics) | 11-case shared-core differential M15-K; T-C06 partially verified, full `RunReport` object pending |
-| No transport dependency is added; `capability.yaml` unchanged | `pyproject.toml`; static scan |
-| Repository gate and CI `applications-gate` pass | `bash scripts/check_repo_gate.sh` |
+| Production tree engine with one daemon worker and one in-flight step | `src/jcheng_applications/tree/runtime.py`; `tests/test_tree_runtime.py`; L3 `evidence/20261126_m1_5_tree/` |
+| Independent Run Supervisor: deadline, cancellation, one stop, stop-error capture | `RunSupervisor`; `tests/test_tree_runtime.py`; probe M15-J |
+| Failure-path differential (call log + stop + report semantics) | 4-case tree-runtime differential + 11-case probe differential M15-K; T-C06 behavioural parity passes, full `RunReport` object pending |
+| No new default dependency; py_trees is an optional `tree` extra | `pyproject.toml`; tree tests skip without it; licence review open |
+| Repository gate and CI `applications-gate` pass | `bash scripts/check_repo_gate.sh`; CI installs the tree extra |
 
-Progress 2026-11-26: M15-A–K pass, including an independent supervisor thread
-(M15-J) and an 11-case failure differential (M15-K). The Shared Execution Core
-is extracted; both the linear runner and the tree driver call it, and
-`runner.py`'s public API is unchanged. The production tree runtime and Run
-Supervisor are still not built, and T-C06 compares behavioural fields rather
-than the full `RunReport` object. M1.5 is In progress, not Complete. It does not
-prove gateway behaviour, concurrency, lease, stop, physical safety or full
-report parity.
+Progress 2026-11-26: the Shared Execution Core is extracted and the opt-in
+production tree engine + Run Supervisor are built. The tree engine passes a
+4-case differential against the linear engine and an L3 run against the real
+system mock gateway (3/3 steps, lease released). The default remains linear;
+py_trees is an optional extra pending licence review. T-C06 compares
+behavioural fields, not the full `RunReport` object. M1.5 is In progress, not
+Complete; it does not prove hardware or physical safety.
 
 ### M2 — read-only gateway client (mainline)
 
@@ -662,7 +664,7 @@ State is `Planned` for every row; this document does not claim a pass.
 | T-C03 | At most one stop request per run, including stop failure | Stop-once | L2 |
 | T-C04 | Exhaustive classification table (outcome × `bus_verified` × scope) | No decision gap | L1 |
 | T-C05 | Golden idempotency keys for v0.1.0 recipes | Key stability for existing plans | L1 |
-| T-C06 | **Shared Core regression** (after extraction): linear and tree runners produce identical call logs, stop behaviour and step reports for the 11-case matrix; the existing 89 tests pass unchanged. **Partially verified 2026-11-26**: the full `RunReport` object is not yet compared | The refactor changed no behaviour | L2 |
+| T-C06 | **Shared Core regression**: linear and tree engines share `StepExecutor`/`classify`; the production tree engine matches the linear engine on state and step outcomes in 4 cases, and the probe matches call logs/stops/steps across 11 cases; the existing 89 tests pass unchanged. **Partially verified 2026-11-26**: the full `RunReport` object is not yet compared | The refactor changed no behaviour | L2 |
 
 ### 16.3 Differential (tree vs linear)
 
@@ -765,13 +767,13 @@ result.
 | K4 | Branch scopes silently widen the authorized surface | Medium | Branch scopes join the recipe union; plan rejected if not covered; T-G04 | S3 |
 | K5 | Two executors drift after the refactor | Medium | The single extraction is done; T-C06 compares call logs, stops and step reports across 11 cases; the full report object is still pending | T-C06 |
 | K6 | Lease TTL is shorter than a long motion | High | Renewal on the supervisor thread at `ttl/3`; if renewal cannot happen during `execute`, the gateway lease contract is reviewed | M3 |
-| K7 | `py_trees` semantics misused (status memory, `terminate`, blackboard) | Medium | Pin 2.6; wrap in `tree/`; leaf tests; no custom composite subclasses. M15-A–I validate the needed subset | M1.5 |
+| K7 | `py_trees` semantics misused (status memory, `terminate`, blackboard) | Medium | Pin 2.6; isolate in `tree/runtime.py`; leaf and differential tests; no custom composite subclasses. M15-A–K and the production tree tests validate the needed subset | M1.5 |
 | K8 | Evidence leaks a token or operator data | Medium | Field allowlist, `lease_id` hashed, `0600`, outside git, gate scan | M1.5 |
 | K9 | `WAITING_FOR_OPERATOR` is mistaken for a resumable pause | Medium | CLI text, exit code, evidence; resumption is a new run; no prompt to retry | M3 |
 | K10 | A learned proposal drifts into a command path | High | Compile-time only; kind allowlist; hash; no runtime API; T-L04 | S3 |
 | K11 | Navigate or perception scope creep bypasses the contract | Medium | Explicit non-goals; contract review triggers; no code until approved | Continuous |
 | K12 | Deadline uses a wall clock that jumps | Low | Monotonic clock for deadlines; wall clock only in evidence | M1.5 |
-| K13 | Third-party licence or supply-chain surprise | Low | `LICENSE-REVIEW.md`; pinned versions. py_trees 2.6 is **not** dependency-free: it requires `pydot>=1.4` (pulled 4.0.1 plus pyparsing) | M1.5 |
+| K13 | Third-party licence or supply-chain surprise | Low | `LICENSE-REVIEW.md`; the optional `tree` extra pins py_trees 2.6.0, pydot 4.0.1 and pyparsing 3.3.3. The engine is not default and the licence review remains open | M1.5 |
 
 ## 18. Open questions
 

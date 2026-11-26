@@ -81,6 +81,7 @@ class _Probe:
         self.results: list[dict[str, Any]] = []
         self.fail_renew = False
         self.execute_status: int | None = None
+        self.execute_delay_s = 0.0
         self.lock = Lock()
 
     def record(self, method: str, path: str, headers: dict[str, str], body: Any) -> None:
@@ -157,6 +158,8 @@ class _Handler(BaseHTTPRequestHandler):
             if probe.execute_status is not None:
                 self._send(probe.execute_status, {"error": {"code": "TEST"}})
                 return
+            if probe.execute_delay_s:
+                time.sleep(probe.execute_delay_s)
             with probe.lock:
                 result = (
                     probe.results.pop(0)

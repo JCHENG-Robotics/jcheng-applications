@@ -6,8 +6,9 @@
 > Admission plus a task-orchestration core: recipe validation, deterministic
 > planning, a fail-closed runner over an abstract gateway port, an M2 read-only
 > transport and an M3 supervised `run` against a mock gateway. The shared
-> execution core is extracted; the M1.5 tree runtime is probe-only. No hardware
-> is used and nothing here runs on the robot.
+> execution core is extracted; an opt-in M1.5 py_trees engine and independent
+> Run Supervisor are available behind `--engine tree`. The default is still the
+> linear engine. No hardware is used and nothing here runs on the robot.
 > English canonical; the Chinese README is a translation.
 
 `jcheng-applications` is the L4 task-orchestration application of the JCHENG
@@ -67,16 +68,18 @@ jcheng-applications/
 │   ├── write_transport.py          # M3 lease/execute/stop transport (mock-only)
 │   ├── lease.py                    # lease acquire, renew, release
 │   ├── runstore.py                 # hash-chained run records outside the repo
-│   ├── supervised.py               # lease + runner + persisted report
+│   ├── supervised.py               # lease + engine + persisted report
 │   ├── core/                       # shared preflight, command, classify, executor, stop-once
-│   ├── runner.py                   # fail-closed runner over the shared core
+│   ├── tree/                       # opt-in py_trees engine + independent Run Supervisor
+│   ├── runner.py                   # fail-closed linear runner over the shared core
 │   └── cli.py                      # validate/plan/check/run CLI
-├── tests/                          # contract, recipe, transport, lease and supervised-run tests
+├── tests/                          # contract, recipe, transport, lease, tree and supervised-run tests
 ├── scripts/check_repo_gate.sh      # repository gate (local and CI)
 ├── scripts/m1_5_pytrees_probe.py   # isolated candidate-runtime probe (not a runtime dependency)
 ├── evidence/20261126_scaffold/     # M0/M1 evidence record
 ├── evidence/20261126_m1_5_pytrees/ # M1.5 isolated probe evidence
 ├── evidence/20261126_m3_supervised/# M3 L3 supervised-run evidence
+├── evidence/20261126_m1_5_tree/    # M1.5 tree engine L3 evidence
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -86,8 +89,10 @@ jcheng-applications/
 ## Requirements
 
 - Python 3.10 or newer (CI uses 3.12), `PyYAML` 6.x and `pytest` 7.4+.
-- `py_trees` 2.6 (BSD-3) is the candidate tree runtime for M1.5, subject to the
-  license review. v0.1.0 does not import it and it is not a dependency yet.
+- `py_trees` 2.6 (BSD-3) is an **optional** `tree` extra for the M1.5 engine:
+  `pip install -e '.[tree]'`. The default linear engine and the repository gate
+  do not import it; the license review is still open. The extra pins
+  `py_trees==2.6.0`, `pydot==4.0.1` and `pyparsing==3.3.3`.
 - No ROS installation, now or later: this repository joins no DDS graph and
   uses no RMW. The gateway is an HTTP/WS boundary.
 - The two transports use the standard library `http.client`; no third-party
@@ -152,6 +157,7 @@ executes motion itself.
 | No hardware, DDS or motion-execution path exists; network access is confined to `transport.py` and `write_transport.py`, and the write path refuses non-mock gateways | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py`; `tests/test_supervised.py` |
 | Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | Shared Execution Core; linear and tree drivers use the same classifier | Partially verified (L2, 2026-11-26) | `tests/test_core.py`; M1.5 M15-K 11-case differential; `evidence/20261126_shared_core/`; full `RunReport` parity pending |
+| Opt-in py_trees engine + independent deadline/cancel/stop supervisor | Partially verified (L2/L3, 2026-11-26) | `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/`; py_trees extra not default; licence review open |
 | Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
 | Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
 | Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |

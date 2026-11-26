@@ -68,6 +68,63 @@ def _stamp(moment: datetime) -> str:
     return moment.isoformat()
 
 
+def make_report(
+    *,
+    recipe: Recipe,
+    run_id: str,
+    operator: str,
+    session_id: str,
+    state: RunState,
+    started_at: str,
+    finished_at: str,
+    steps: tuple[StepReport, ...],
+    abort_reason: str | None,
+    stop_error: str | None,
+) -> RunReport:
+    """Assemble a report without inferring or interpolating a value."""
+
+    return RunReport(
+        run_id=run_id,
+        recipe_name=recipe.name,
+        recipe_version=recipe.version,
+        contract_hash=recipe.contract_hash,
+        operator=operator,
+        session_id=session_id,
+        state=state,
+        started_at=started_at,
+        finished_at=finished_at,
+        steps=steps,
+        abort_reason=abort_reason,
+        stop_error=stop_error,
+    )
+
+
+def aborted_report(
+    recipe: Recipe,
+    authorization: Authorization,
+    run_id: str,
+    reason: str,
+    *,
+    clock: Callable[[], datetime] = _utcnow,
+) -> RunReport:
+    """A preflight refusal: nothing was submitted."""
+
+    started_at = _stamp(clock())
+    finished_at = _stamp(clock())
+    return make_report(
+        recipe=recipe,
+        run_id=run_id,
+        operator=authorization.operator if isinstance(authorization, Authorization) else "",
+        session_id=authorization.session_id if isinstance(authorization, Authorization) else "",
+        state=RunState.ABORTED,
+        started_at=started_at,
+        finished_at=finished_at,
+        steps=(),
+        abort_reason=reason,
+        stop_error=None,
+    )
+
+
 class TaskRunner:
     """Run a recipe step by step against a :class:`GatewayPort`."""
 
@@ -166,17 +223,14 @@ class TaskRunner:
         abort_reason: str | None,
         stop_error: str | None,
     ) -> RunReport:
-        finished_at = _stamp(self._clock())
-        return RunReport(
+        return make_report(
+            recipe=recipe,
             run_id=run_id,
-            recipe_name=recipe.name,
-            recipe_version=recipe.version,
-            contract_hash=recipe.contract_hash,
             operator=operator,
             session_id=session_id,
             state=state,
             started_at=started_at,
-            finished_at=finished_at,
+            finished_at=_stamp(self._clock()),
             steps=steps,
             abort_reason=abort_reason,
             stop_error=stop_error,

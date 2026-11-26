@@ -1,0 +1,64 @@
+{
+  "run_finished": {
+    "abort_reason": null,
+    "contract_hash": "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42",
+    "finished_at": "2026-11-26T06:15:48.703188+00:00",
+    "lease_released": true,
+    "operator": "operator",
+    "recipe_name": "m15-tree-e2e",
+    "recipe_version": "0.1.0",
+    "report_hash": "5512b411c84987d2562b810b4e76864c6077d77629cf753768a3d2ef51de7e30",
+    "run_id": "m15-tree-001",
+    "session_id": "m15-tree",
+    "started_at": "2026-11-26T06:15:48.642115+00:00",
+    "state": "SUCCEEDED",
+    "steps": [
+      {
+        "bus_verified": true,
+        "idempotency_key": "366094ff9b23781449a689eb434d38c8d96ee4514fca567191d5a61a93e81795",
+        "index": 0,
+        "intent_id": "app-366094ff9b23781449a689eb",
+        "message": "motion completed with bus verification",
+        "name": "approach-j1",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      },
+      {
+        "bus_verified": true,
+        "idempotency_key": "383c94ff645cd02dee4a15c5e686243a4996a0a8a8f309a09798fb062b801707",
+        "index": 1,
+        "intent_id": "app-383c94ff645cd02dee4a15c5",
+        "message": "motion completed with bus verification",
+        "name": "approach-j2",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      },
+      {
+        "bus_verified": true,
+        "idempotency_key": "f36c9162c0dc95dedf67d39adb6babeea3fb37134e097c46d58cabbf94fe708f",
+        "index": 2,
+        "intent_id": "app-f36c9162c0dc95dedf67d39a",
+        "message": "motion completed with bus verification",
+        "name": "grasp",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      }
+    ],
+    "stop_error": null
+  },
+  "run_started": {
+    "contract_hash": "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42",
+    "evidence_class": "L3",
+    "lease_ref": "36decb63215c0f3d2f01b45c42bc47cf9256efe12e1cf2d91956620c3105640f",
+    "operator": "operator",
+    "plan_hash": "f5a421c1f707904965be03996e3ea8009913310553f24022e2d6edfe06cd4594",
+    "recipe_hash": "ebdd46480b18a24a2420d6944191d14e2665983bd07df0874772f31188ad657e",
+    "recipe_name": "m15-tree-e2e",
+    "recipe_version": "0.1.0",
+    "run_id": "m15-tree-001",
+    "session_id": "m15-tree"
+  }
+}
