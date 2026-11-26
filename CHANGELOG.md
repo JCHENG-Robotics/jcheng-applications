@@ -26,6 +26,10 @@ All notable changes to this project are documented here. Format based on
 - `recipes/example-declared-branch.yaml`, `tests/test_branches.py` and
   `evidence/20261126_s3_branches/`: L3 against the real system mock gateway
   (fact `index 0=0.03`, guard `PASS`, branch selected, 2/2 steps).
+- The tree engine now executes declared branches: `SelectionLeaf`, a py_trees
+  `Selector` over per-branch sequences and a closed no-branch fallback. Four
+  branch cases have exact linear/tree report parity; L3 evidence is
+  `evidence/20261126_s3_tree/`; `tests/test_tree_branches.py`.
 - M1.5 opt-in production tree engine: `src/jcheng_applications/tree/runtime.py`
   runs a `py_trees` `Sequence` over the shared `StepExecutor` with one daemon
   worker (one in-flight step), a `StepLog` that separates completed and late
@@ -97,10 +101,11 @@ All notable changes to this project are documented here. Format based on
 
 ### Changed
 
-- S3 v0 runs on the linear engine. The tree engine refuses a facts/branches
-  recipe until branch support lands. Facts are positional arm positions only;
+- S3 v0 runs on both engines. The tree engine evaluates the selector once per
+  anchor, ticks only the selected branch, and propagates a selected branch
+  failure instead of falling back. Facts are positional arm positions only;
   named-joint and gripper facts need a `jcheng-interfaces` change (proposal
-  filed). A required branch with no candidate is `ABORTED` + one stop, not a
+  merged). A required branch with no candidate is `ABORTED` + one stop, not a
   live `WAITING_FOR_OPERATOR`.
 - The default execution engine stays linear. The py_trees engine is opt-in and
   the `LICENSE-REVIEW.md` review of py_trees/pydot/pyparsing remains open; the

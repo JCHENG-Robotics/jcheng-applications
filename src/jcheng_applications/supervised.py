@@ -85,11 +85,6 @@ def run_supervised(
         gateway.check_mock()
 
     plan = build_plan(recipe, run_id)
-    if tree_run is not None and (plan.facts or plan.branches):
-        raise ValueError(
-            "the tree engine does not support declared facts/branches yet; "
-            "use --engine linear"
-        )
     session = LeaseSession(
         gateway,
         holder=authorization.operator,

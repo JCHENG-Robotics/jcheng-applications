@@ -61,9 +61,11 @@ class LeaseSession:
                 self._gateway.renew_lease(self.lease_id, self._ttl_ms)
                 self.renewals += 1
             except Exception as exc:  # noqa: BLE001 - a lost lease stops the run
-                self.lost = True
                 self.error = f"{type(exc).__name__}: {exc}"
+                # Latch the gateway before publishing the lost flag: a caller
+                # that observes ``lost`` must not be able to submit.
                 self._gateway.mark_lease_lost(self.error)
+                self.lost = True
                 try:
                     self._gateway.stop(f"lease renewal failed: {self.error}")
                 except Exception:

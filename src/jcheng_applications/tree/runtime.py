@@ -26,7 +26,8 @@ from ..core.preflight import (
     check_lease,
     check_safety,
 )
-from ..core.report import StepReport
+from ..core.report import SelectionRecord, StepReport
+from ..core.strategy import select_branch
 from ..model import Authorization, Plan, PlanStep, Recipe
 from ..runner import RunReport, RunState, make_report
 
@@ -182,6 +183,9 @@ class SubmitLeaf(py_trees.behaviour.Behaviour):
         supervisor: RunSupervisor,
         run_id: str,
         lease_id: str,
+        *,
+        record_main: bool = True,
+        main_outcomes: dict[str, StepOutcome] | None = None,
     ) -> None:
         super().__init__(step.name)
         self._step = step
@@ -191,6 +195,8 @@ class SubmitLeaf(py_trees.behaviour.Behaviour):
         self._supervisor = supervisor
         self._run_id = run_id
         self._lease_id = lease_id
+        self._record_main = record_main
+        self._main_outcomes = main_outcomes if main_outcomes is not None else {}
         self.future: Future | None = None
         self.started = False
         self.outcome: StepOutcome | None = None
@@ -235,6 +241,8 @@ class SubmitLeaf(py_trees.behaviour.Behaviour):
         self.outcome = outcome
         self._log.append(outcome)
         if outcome.decision is Decision.CONTINUE:
+            if self._record_main:
+                self._main_outcomes[self._step.name] = outcome
             return Status.SUCCESS
         self._supervisor.request_stop(
             outcome.reason or outcome.decision.value
@@ -248,6 +256,77 @@ class SubmitLeaf(py_trees.behaviour.Behaviour):
             and not self.future.done()
         ):
             self.future.add_done_callback(self._log.add_late)
+
+
+class SelectionState:
+    """The chosen branch for one anchor; shared by the selector children."""
+
+    def __init__(self) -> None:
+        self.selected: str | None = None
+
+
+class SelectionLeaf(py_trees.behaviour.Behaviour):
+    """Evaluate the declared branches once after their anchor main step."""
+
+    def __init__(
+        self,
+        after_step: str,
+        plan: Plan,
+        main_outcomes: dict[str, StepOutcome],
+        state: SelectionState,
+        selections: list[SelectionRecord],
+        supervisor: RunSupervisor,
+    ) -> None:
+        super().__init__(f"select-after-{after_step}")
+        self._after = after_step
+        self._plan = plan
+        self._main_outcomes = main_outcomes
+        self._state = state
+        self._selections = selections
+        self._supervisor = supervisor
+
+    def update(self) -> Status:
+        record, branch = select_branch(
+            self._plan, self._after, self._main_outcomes
+        )
+        if record is not None:
+            self._selections.append(record)
+        self._state.selected = branch.id if branch is not None else None
+        if branch is None:
+            required = any(
+                candidate.after == self._after and candidate.required
+                for candidate in self._plan.branches
+            )
+            if required:
+                reason = (
+                    f"required branch after {self._after!r} has no eligible "
+                    "candidate"
+                )
+                self._supervisor.request_stop(reason)
+                return Status.FAILURE
+        return Status.SUCCESS
+
+
+class BranchCondition(py_trees.behaviour.Behaviour):
+    """SUCCESS only for the selected branch; the None child is the fallback."""
+
+    def __init__(self, state: SelectionState, branch_id: str | None) -> None:
+        super().__init__(f"is-{branch_id or 'none'}")
+        self._state = state
+        self._branch_id = branch_id
+
+    def update(self) -> Status:
+        if self._branch_id is None:
+            return (
+                Status.SUCCESS
+                if self._state.selected is None
+                else Status.FAILURE
+            )
+        return (
+            Status.SUCCESS
+            if self._state.selected == self._branch_id
+            else Status.FAILURE
+        )
 
 
 def _state_for(decision: Decision) -> RunState:
@@ -303,11 +382,16 @@ def run_tree(
 
     started_at = _stamp(clock())
     log = StepLog()
+    main_outcomes: dict[str, StepOutcome] = {}
+    selections: list[SelectionRecord] = []
+    selection_state = SelectionState()
     worker = _DaemonWorker()
     executor = StepExecutor(gateway)
     supervisor = RunSupervisor(gateway.stop, deadline_s)
-    leaves = [
-        SubmitLeaf(
+    all_leaves: list[SubmitLeaf] = []
+    children: list[py_trees.behaviour.Behaviour] = []
+    for step in plan.steps:
+        main_leaf = SubmitLeaf(
             step,
             executor,
             worker,
@@ -315,11 +399,65 @@ def run_tree(
             supervisor,
             run_id,
             lease_id,
+            record_main=True,
+            main_outcomes=main_outcomes,
         )
-        for step in plan.steps
-    ]
+        all_leaves.append(main_leaf)
+        children.append(main_leaf)
+
+        anchored = [
+            branch for branch in plan.branches if branch.after == step.name
+        ]
+        if not anchored:
+            continue
+        children.append(
+            SelectionLeaf(
+                step.name,
+                plan,
+                main_outcomes,
+                selection_state,
+                selections,
+                supervisor,
+            )
+        )
+        branch_children: list[py_trees.behaviour.Behaviour] = []
+        for branch in anchored:
+            branch_leaves: list[py_trees.behaviour.Behaviour] = []
+            for branch_step in branch.steps:
+                leaf = SubmitLeaf(
+                    branch_step,
+                    executor,
+                    worker,
+                    log,
+                    supervisor,
+                    run_id,
+                    lease_id,
+                    record_main=False,
+                    main_outcomes=main_outcomes,
+                )
+                all_leaves.append(leaf)
+                branch_leaves.append(leaf)
+            branch_children.append(
+                py_trees.composites.Sequence(
+                    branch.id,
+                    memory=True,
+                    children=[
+                        BranchCondition(selection_state, branch.id),
+                        *branch_leaves,
+                    ],
+                )
+            )
+        branch_children.append(BranchCondition(selection_state, None))
+        children.append(
+            py_trees.composites.Selector(
+                f"branches-after-{step.name}",
+                memory=True,
+                children=branch_children,
+            )
+        )
+
     tree = py_trees.trees.BehaviourTree(
-        py_trees.composites.Sequence("plan", memory=True, children=leaves)
+        py_trees.composites.Sequence("plan", memory=True, children=children)
     )
     supervisor.start()
     try:
@@ -338,13 +476,13 @@ def run_tree(
     abort_reason: str | None = None
     in_flight = False
     reports: list[StepReport] = []
-    for leaf in leaves:
-        if leaf.outcome is not None:
-            reports.append(leaf.outcome.report)
-            if leaf.outcome.decision is not Decision.CONTINUE:
-                state = _state_for(leaf.outcome.decision)
-                abort_reason = leaf.outcome.reason
-        elif leaf.started:
+    for outcome in list(log.outcomes):
+        reports.append(outcome.report)
+        if outcome.decision is not Decision.CONTINUE:
+            state = _state_for(outcome.decision)
+            abort_reason = outcome.reason
+    for leaf in all_leaves:
+        if leaf.started and leaf.outcome is None:
             in_flight = True
             reason = supervisor.reason or "run stopped"
             reports.append(_stopped_step(leaf.step, reason))
@@ -355,8 +493,8 @@ def run_tree(
         if in_flight:
             state = RunState.INDETERMINATE
         elif state is RunState.SUCCEEDED:
-            # A stop or deadline arrived after the last completed step; the
-            # run is not reported as success.
+            # A required branch had no candidate, or a stop/deadline arrived
+            # after the last completed step; the run is not a success.
             state = RunState.ABORTED
         if abort_reason is None:
             abort_reason = supervisor.reason or "run stopped"
@@ -372,4 +510,5 @@ def run_tree(
         steps=tuple(reports),
         abort_reason=abort_reason,
         stop_error=supervisor.stop_error,
+        selections=tuple(selections),
     )

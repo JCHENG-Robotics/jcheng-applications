@@ -1,0 +1,81 @@
+{
+  "run_finished": {
+    "abort_reason": null,
+    "contract_hash": "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42",
+    "finished_at": "2026-11-26T07:31:03.350123+00:00",
+    "lease_released": true,
+    "operator": "operator",
+    "recipe_name": "example-declared-branch",
+    "recipe_version": "0.2.0",
+    "report_hash": "69d35f4a4c07177389be89fb1628dee85200dec02d0fc31f358c89e26843be37",
+    "run_id": "s3-tree-001",
+    "selections": [
+      {
+        "after_step": "approach-j1",
+        "candidates": [
+          {
+            "branch_id": "adjust-j1.v1",
+            "guard": "PASS",
+            "selected": true
+          }
+        ],
+        "reason": "selected adjust-j1.v1",
+        "selected": "adjust-j1.v1"
+      }
+    ],
+    "session_id": "s3-tree",
+    "started_at": "2026-11-26T07:31:03.309031+00:00",
+    "state": "SUCCEEDED",
+    "steps": [
+      {
+        "bus_verified": true,
+        "idempotency_key": "38f925ec9f740787a02673ee7a9f6533fef2624db9f111ca0b5c9579bf29564e",
+        "index": 0,
+        "intent_id": "app-38f925ec9f740787a02673ee",
+        "measured_positions": [
+          0.03,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "message": "motion completed with bus verification",
+        "name": "approach-j1",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      },
+      {
+        "bus_verified": true,
+        "idempotency_key": "5fc5dffecb410d07d38d7ae187948802bb5ad396007e49ac2752206c162eeacb",
+        "index": 1,
+        "intent_id": "app-5fc5dffecb410d07d38d7ae1",
+        "measured_positions": [
+          0.05,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "message": "motion completed with bus verification",
+        "name": "adjust-j1",
+        "outcome": "COMPLETED",
+        "reason_code": "OK",
+        "safety_state": "ARMED_IDLE"
+      }
+    ],
+    "stop_error": null
+  },
+  "run_started": {
+    "contract_hash": "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42",
+    "evidence_class": "L3",
+    "lease_ref": "40c83df44b75c3ed1c2f1c084a7e746f685e8ecf00ee9d2d76ab83afa5b8c940",
+    "operator": "operator",
+    "plan_hash": "53812650e655bd8b389aadb4528a4d53875b95fd54e1c70699c91aca9bf633d4",
+    "recipe_hash": "bfc98a1eac79ef40d1163cacae8fb32dd72f2d79645229456ac500b1bbc74dc3",
+    "recipe_name": "example-declared-branch",
+    "recipe_version": "0.2.0",
+    "run_id": "s3-tree-001",
+    "session_id": "s3-tree"
+  }
+}
