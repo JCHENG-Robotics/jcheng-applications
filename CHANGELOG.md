@@ -17,6 +17,10 @@ All notable changes to this project are documented here. Format based on
   `stop_error` set. No schema, tag or contract hash changed.
 - `tests/test_stop_confirmation.py`: receipt parsing, invalid-field refusal, and
   S1/S2/failure/no-stop behaviour on the linear and tree engines.
+- L3 legacy compatibility check: the real `jcheng_system_core` mock gateway
+  returns a `StopResponse` without R5 fields after a rejected step; the app
+  records `request_accepted` / `unverified`, releases the lease and verifies the
+  hash chain. Evidence: `evidence/20261126_stop_confirmation/`.
 - Derived Plan identity guard: `run --derived-from <run-id>` requires a
   hash-chain-verified predecessor record, the same recipe name, a new recipe
   version, a new run id and a new authorization session. The guard runs before

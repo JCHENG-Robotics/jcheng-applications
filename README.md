@@ -174,7 +174,7 @@ authorization session; a violation refuses before any gateway call.
 | Terminal `WAITING_FOR_OPERATOR`: `operator_required` + CLI exit 3, no motion authority | Verified (L2, 2026-11-26) | `tests/test_waiting.py`; `evidence/20261126_waiting/`; live channel not implemented |
 | Derived Plan identity: verified predecessor, new recipe version, run id and authorization session before any gateway call | Verified (L1/L2, 2026-11-26) | `tests/test_derived.py`; `evidence/20261126_derived_plan/` |
 | Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
-| Stop confirmation levels: legacy response is S1 only, S2 requires `backend_confirmed`, physical stop is always `unverified` | Verified (L1/L2, 2026-11-26) | `tests/test_stop_confirmation.py`; R5 schema review pending |
+| Stop confirmation levels: legacy response is S1 only, S2 requires `backend_confirmed`, physical stop is always `unverified` | Verified (L1–L3, 2026-11-26) | `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` (real system mock gateway, legacy S1); R5 schema review pending |
 | Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
 | Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |
 | Any hardware behavior | Unverified | No L5 session; no runtime |

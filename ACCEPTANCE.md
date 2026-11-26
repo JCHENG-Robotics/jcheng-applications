@@ -24,7 +24,7 @@
 | S3 declared branches — tree engine | exact linear/tree report parity | L3 | pass | `evidence/20261126_s3_tree/` |
 | WAITING_FOR_OPERATOR | both engines + loopback CLI | L2–L3 | pass (CLI exit 3, no motion authority) | `evidence/20261126_waiting/` |
 | Derived-plan guard | verified predecessor before any gateway call | L3 | pass (zero-request refusal) | `evidence/20261126_derived_plan/` |
-| Stop confirmation receipt | both engines; legacy/S1, explicit S2, failure, no stop | L1/L2 | pass (13 tests) | `tests/test_stop_confirmation.py` |
+| Stop confirmation receipt | both engines; legacy/S1, explicit S2, failure, no stop | L1–L3 | pass (16 tests, 2 tree-only; L3 legacy S1 on the real system mock gateway) | `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` |
 | P0 C1–C5 (system dependency) | `jcheng-system` concurrency probe | L3 | pass (zero double terminals) | `jcheng-system/e2e/reports/20261126_concurrency_probe_r2/` |
 | Hardware | — | L5 | not run | — |
 
@@ -42,7 +42,7 @@
 | A terminal WAITING_FOR_OPERATOR reports exit 3 and grants no motion authority | L3 | `tests/test_waiting.py` |
 | `--derived-from` verifies the predecessor hash chain and requires a new recipe version, run id and authorization before any gateway call | L3 | `tests/test_derived.py` |
 | The system P0 C2 double-terminal failure is resolved on the mock (C1–C5, stress loop) | L3 | system probe evidence |
-| A legacy stop response records S1 only; S2 requires `backend_confirmed`; `physical_stop` is only `unverified`; a failed stop records no level | L1/L2 | `tests/test_stop_confirmation.py` |
+| A legacy stop response records S1 only; S2 requires `backend_confirmed`; `physical_stop` is only `unverified`; a failed stop records no level | L1–L3 | `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` (real system mock gateway) |
 
 ## 3. Not verified
 

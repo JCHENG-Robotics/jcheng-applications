@@ -150,7 +150,7 @@ operator runbook.
 | v0.1.0 admission and offline core | `python3 -m pytest -q`; `bash scripts/check_repo_gate.sh` |
 | M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI `applications-gate` passed |
 | M3 supervised execution | Real `jcheng-system` gateway process + `MockStack` on loopback (L3, 2026-11-26): lease acquire/release, 3/3 steps, stop-on-rejection, hash-chained record. No robot. Evidence: `evidence/20261126_m3_supervised/` |
-| Stop confirmation receipt | Optional R5 fields parsed on both engines (L1, 2026-11-26): absent → S1, explicit `backend_confirmed` → S2, `physical_stop` only `unverified`, stop failure → no level. Evidence: `tests/test_stop_confirmation.py` |
+| Stop confirmation receipt | Optional R5 fields parsed on both engines (L1–L3, 2026-11-26): absent → S1, explicit `backend_confirmed` → S2, `physical_stop` only `unverified`, stop failure → no level. The real system mock gateway (legacy response) records S1 only. Evidence: `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` |
 | M1.5 tree engine | Opt-in `--engine tree` against the same system mock gateway (L3, 2026-11-26): 3/3 steps, lease released; L2 deadline/rejection/one-stop tests. Evidence: `evidence/20261126_m1_5_tree/` |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 

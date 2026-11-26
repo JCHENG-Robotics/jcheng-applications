@@ -310,7 +310,9 @@ Consequences:
   drivers use the same parser and the T-C06 parity suite covers the fields.
 - The proposal is not yet in the schema; this is client-side, forward-compatible
   support. No schema, tag or contract hash changed. Tests:
-  `tests/test_stop_confirmation.py`.
+  `tests/test_stop_confirmation.py`. L3 legacy check on the real
+  `jcheng_system_core` mock gateway: `evidence/20261126_stop_confirmation/`
+  recorded S1 + `unverified` for the current response shape.
 
 ## 8. Plan compilation, declared branches and Derived Plans
 

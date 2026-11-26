@@ -1,7 +1,8 @@
 # Stop confirmation receipt — evidence
 
-> Date: 2026-11-26. Level: **L1/L2** (loopback mock gateway; no robot).
-> Client-side support for the open R5 proposal
+> Date: 2026-11-26. Level: **L3** for legacy compatibility (real
+> `jcheng_system_core` mock gateway + `MockStack`); **L1/L2** for S2 scripting.
+> No robot. Client-side support for the open R5 proposal
 > `jcheng-interfaces/docs/proposals/stop-confirmation-levels.md`. No schema,
 > tag or contract hash changed.
 
@@ -42,23 +43,46 @@ partially. Both drivers write `RunReport.stop_confirmation` and
 | successful run | no stop, no level |
 | malformed receipt object | `(None, None)`, no partial trust |
 
-## 3. Verification
+## 3. L3 legacy check (real system mock gateway)
+
+The real `jcheng_system_core` gateway process and `MockStack` ran on
+`127.0.0.1:18767`. The recipe's first `JOINT_STEP` is multi-joint, so the system
+rejected it with `INVALID_COMMAND`; the app requested one stop. The current
+`StopResponse` has no R5 fields.
+
+| Observed | Value |
+|---|---|
+| CLI exit | `1` (clean `FAILED`, no operator wait) |
+| State / steps | `FAILED`; one `REJECTED / INVALID_COMMAND` |
+| Stop | `stop_error: null`, `stop_confirmation: request_accepted`, `physical_stop: unverified` |
+| Lease | released |
+| Record | hash chain verifies, mode `0600`, external store (not committed) |
+
+This proves the client records **S1 only** for the legacy gateway. It does not
+prove S2: that waits for R5 to be approved and emitted by the gateway. Files:
+[`l3-legacy-cli.json`](l3-legacy-cli.json),
+[`l3-legacy-summary.json`](l3-legacy-summary.json),
+[`l3-legacy.txt`](l3-legacy.txt). No hardware was used.
+
+## 4. Verification
 
 ```text
 with the tree extra: 197 passed
 without py_trees:    175 passed, 5 skipped
 gate:                175 passed, 5 skipped, OK
+L3 legacy:           CLI exit 1, S1 + unverified, record verified
 ```
 
 Raw output: [`pytest-tree.txt`](pytest-tree.txt),
 [`pytest-bare.txt`](pytest-bare.txt), [`gate.txt`](gate.txt).
 
-## 4. Limitations
+## 5. Limitations
 
 - The R5 fields are not in the published schema yet. A deployed gateway may
   omit them; the client then records S1 only. S2 is never inferred.
-- The mock scripts the fields; this is not gateway evidence. The system-side
-  C1/C2 probes and the deployed-gateway repeat remain separate.
+- The mock/loopback cases script the fields; the L3 case uses the real system
+  mock gateway but only proves legacy S1. The system-side C1/C2 probes and the
+  deployed-gateway repeat remain separate.
 - `physical_stop` is a constant `unverified`. There is no e-stop, brake,
   encoder or force sensing on this platform.
 - No hardware and no real-robot claim.
