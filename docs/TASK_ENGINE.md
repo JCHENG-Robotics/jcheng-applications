@@ -13,10 +13,13 @@
 > Supervisor are in `src/jcheng_applications/tree/` as the opt-in
 > `--engine tree`; the default is still linear. The probe and report are in
 > `scripts/m1_5_pytrees_probe.py` and [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md).
-> Declared branches and strategy selection are **not** implemented.
+> Declared branches and a three-valued selector are implemented for the
+> **linear engine** with positional arm facts (S3 v0). The tree engine refuses
+> branch recipes; named-joint/gripper facts need a contract change.
 >
-> M2, M3 and the M1.5 tree engine are implemented on the mock. L3 evidence:
-> `evidence/20261126_m3_supervised/` and `evidence/20261126_m1_5_tree/` (real
+> M2, M3, the M1.5 tree engine and S3 v0 are implemented on the mock. L3
+> evidence: `evidence/20261126_m3_supervised/`,
+> `evidence/20261126_m1_5_tree/` and `evidence/20261126_s3_branches/` (real
 > `jcheng-system` gateway process + `MockStack`, no robot). The deployed
 > gateway must still pass C1–C5 and R5 before M4. No hardware execution is opened before M4, and every M4 session needs
 > separate, explicit operator authorization. Offline evidence and hardware
@@ -336,43 +339,53 @@ an attempt.
 missing, non-finite or unknown-joint value makes the fact `UNKNOWN`, never
 zero and never a guess.
 
-### 8.3 Declared branch format (proposed, not implemented)
+### 8.3 Declared branch format (implemented, format 0.2)
 
-Additive recipe fields, reviewed at S3. v0.1.0 recipes remain valid; the
-`jcheng-interfaces` contract hash does not change because commands are
-unchanged.
+Additive recipe fields, implemented for the linear engine at S3 v0. v0.1.0
+recipes remain valid; the `jcheng-interfaces` contract hash does not change
+because commands are unchanged.
 
 ```yaml
 facts:
-  gripper_closed:
-    from_step: close-gripper
-    measured: { joint: gripper_joint, at_most_rad: 0.15 }
+  joint1_moved:
+    from_step: approach-j1
+    measured: { index: 0, at_least_rad: 0.02 }
 
 branches:
-  - id: grasp.re-approach.v1
-    after: close-gripper
+  - id: adjust-j1.v1
+    after: approach-j1
     required: false
+    priority: 10
     when:
-      - { fact: gripper_closed, equals: true }
+      - { fact: joint1_moved, equals: true }
     steps:
-      - name: reopen
-        kind: GRIPPER
-        profile: gripper
-        scopes: [gripper]
-        params: { gripper: { position_rad: 1.0, max_velocity_rad_s: 0.5, duration_s: 1.0, verify_bus: true } }
+      - name: adjust-j1
+        kind: JOINT_STEP
+        profile: step
+        scopes: [arm]
+        params: { joint_names: [joint1], target_positions: [0.05], max_velocity_rad_s: 0.4, duration_s: 1.0, verify_bus: true }
 ```
 
 Rules:
 
 - `after` must name an earlier main step; a branch cannot anchor on another
   branch (no branch chains in v0.2).
-- Branch steps are compiled at plan time and count toward the recipe's scope
-  union. `Authorization` must cover them, otherwise the recipe is rejected
-  before any gateway call. There is no mid-run scope widening.
-- `required: true` with no eligible branch enters `WAITING_FOR_OPERATOR`.
+- A fact's `from_step` must be a main step measured at or before the anchor.
+  `measured.index` is positional: the v0.1 contract has no joint names and no
+  gripper measurement. A named/gripper fact needs a contract change.
+- Branch steps are compiled at plan time with their own `branch_id`/
+  `branch_index` keys and count toward the recipe's scope union.
+  `Authorization` must cover them, otherwise the recipe is rejected before any
+  gateway call. There is no mid-run scope widening.
+- `required: true` with no eligible branch is `ABORTED` with one stop in the
+  linear engine (the v0 approximation of `WAITING_FOR_OPERATOR`).
   `required: false` continues the main plan.
 - Conditions are structured comparisons over an allowlisted fact vocabulary.
   No expression strings, no `eval`, no callable names from data.
+- The tree engine refuses a facts/branches recipe until branch support lands.
+- Verified: `tests/test_branches.py`; L3
+  `evidence/20261126_s3_branches/`; example
+  [`recipes/example-declared-branch.yaml`](../recipes/example-declared-branch.yaml).
 
 ### 8.4 Derived Plan
 
@@ -619,15 +632,21 @@ There is no application-layer workaround for a gateway defect.
 
 ### S3 — declared branches and selection (parallel after M3)
 
-| Exit criterion | Evidence |
+| Exit criterion | Status and evidence |
 |---|---|
-| Recipe format with `facts` and `branches` validates; v0.1.0 recipes unchanged | L1 |
-| Branch scopes are part of the recipe union and must be authorized | L1 |
-| Selector is three-valued, deterministic and cannot read execution outcomes | L1 |
-| No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | L2 |
-| Derived Plan requires a new version, run id and authorization | L1/L2 |
-| Proposal artifact accepts only `params`/`skill`, requires a hash and is recorded | L1 |
-| Everything above runs against a mock gateway only | L2 |
+| Recipe format with `facts` and `branches` validates; v0.1.0 recipes unchanged | **Verified L1**: `tests/test_branches.py` |
+| Branch scopes are part of the recipe union and must be authorized | **Verified L1**: scope-union test |
+| Selector is three-valued, deterministic and cannot read execution outcomes | **Verified L1/L2**: guard table, no-branch-on-failure test |
+| No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | **Partially verified**: linear engine is `ABORTED` + one stop; live `WAITING_FOR_OPERATOR` is not implemented |
+| Derived Plan requires a new version, run id and authorization | **Documented only**: no run registry enforces predecessor identity |
+| Proposal artifact accepts only `params`/`skill`, requires a hash and is recorded | **Not implemented** |
+| Everything above runs against a mock gateway only | **Verified L3**: real system mock gateway + `MockStack`, no robot; tree engine refuses branch recipes |
+
+**S3 v0 (2026-11-26).** Declared branches, positional facts and the
+three-valued selector run on the linear engine. L3 evidence:
+`evidence/20261126_s3_branches/` (fact `index 0=0.03`, guard `PASS`, branch
+selected, 2/2 steps). Named-joint/gripper facts, tree branch execution and a
+live `WAITING_FOR_OPERATOR` remain open.
 
 ### M4 — supervised hardware acceptance (separate authorization)
 
@@ -785,28 +804,31 @@ result.
    `docs/EXECUTION-MODEL-REVISION.md`.
 2. **Lease TTL vs longest motion.** What is the deployed TTL, and can a renewal
    be served while `execute` is running? Owner: `jcheng-system`.
-3. **Recipe format review.** The `facts`/`branches` extension in §8.3 needs a
-   review of the predicate vocabulary before implementation. Owner: this
-   repository.
+3. **Recipe format review (partially answered).** `facts`/`branches` are
+   implemented with positional arm facts and structured conditions (S3 v0).
+   Named-joint and gripper facts need a `jcheng-interfaces` change; the
+   proposal is in that repository. Owner: `jcheng-interfaces`.
 4. **Operator channel.** Is `WAITING_FOR_OPERATOR` only a process state with a
    non-zero exit, or does `jcheng-studio` need a live channel? The latter is a
    contract review item. Owner: `jcheng-studio`.
 5. **Evidence retention and redaction.** How long are run records kept, and are
    canonical commands retained or only hashed? Owner: operations.
-6. **`measured_positions` stability.** Are joint names and units stable across
-   robot profiles, and is `profile_hash` sufficient to bind a fact projection?
-   Owner: `jcheng-system` / `jcheng-interfaces`.
+6. **`measured_positions` stability (open, now central to facts).** The array
+   is positional and has no joint names or gripper value; S3 v0 uses an index.
+   Are the order and units stable across profiles, and is `profile_hash`
+   sufficient to bind a fact? Owner: `jcheng-system` /
+   `jcheng-interfaces`.
 7. **Merge order (resolved 2026-11-26).** M2 landed `transport.py`; the
    Shared Execution Core extraction landed afterwards as one refactor.
-   T-C06 is partially verified; the full `RunReport` comparison is the
-   remaining piece.
+   T-C06 is verified with a 12-case exact `RunReport` comparison.
 
 ## 19. Related
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — components, run state machine and invariants.
-- [`RECIPES.md`](RECIPES.md) — implemented recipe format; §8.3 here is a proposal.
+- [`RECIPES.md`](RECIPES.md) — implemented recipe format, including facts/branches.
 - [`INTEGRATION.md`](INTEGRATION.md) — gateway admission, transport and failure semantics.
-- [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md) — isolated py_trees probe and its limits.
+- [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md) — py_trees probe, tree engine and T-C06.
+- [`../evidence/20261126_s3_branches/`](../evidence/20261126_s3_branches/README.md) — S3 v0 L3 evidence.
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.

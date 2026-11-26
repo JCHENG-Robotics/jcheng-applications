@@ -58,6 +58,7 @@ def completed(
     bus_verified: bool = True,
     safety_state: str = "ARMED_IDLE",
     stop_latched: bool = False,
+    measured_positions: list[float] | None = None,
 ) -> dict[str, Any]:
     return {
         "outcome": outcome,
@@ -70,7 +71,7 @@ def completed(
             "seq": 1,
             "last_valid_state_at": NOW,
         },
-        "measured_positions": [],
+        "measured_positions": list(measured_positions or []),
     }
 
 

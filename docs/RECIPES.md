@@ -17,7 +17,8 @@ authorized session under the system layer's lease, limits and stop latch.
 
 ## 2. Top-level fields
 
-A recipe is a YAML mapping with exactly these fields:
+A recipe is a YAML mapping with these fields; `facts` and `branches` are
+optional (format 0.2):
 
 | Field | Type | Rule |
 |---|---|---|
@@ -25,8 +26,10 @@ A recipe is a YAML mapping with exactly these fields:
 | `version` | string | `MAJOR.MINOR.PATCH`; recipe-local, independent of the repository version |
 | `description` | string | non-empty; state the intent and any calibration dependency |
 | `contract_hash` | string | must equal the pinned v0.1.0 contract hash |
-| `scopes` | list | non-empty subset of `arm`, `gripper`, `base`, `full`; must equal the union of step scopes; `full` cannot be combined |
-| `steps` | list | 1 to 64 steps; names unique |
+| `scopes` | list | non-empty subset of `arm`, `gripper`, `base`, `full`; must equal the union of **main and branch** step scopes; `full` cannot be combined |
+| `steps` | list | 1 to 64 main steps; names unique across main and branches |
+| `facts` | mapping | optional; named measured-position facts (see §4.1) |
+| `branches` | list | optional; declared branches (see §4.1) |
 
 Unknown fields are rejected. The loader does not ignore a typo.
 
@@ -71,6 +74,70 @@ A step's scope must match the command it carries: `JOINT_TRAJECTORY`,
 `JOINT_STEP`, `POSE` and `HOME` use `arm`; `BASE_PULSE` uses `base`; `GRIPPER`
 uses `gripper`. Any of them may use `full` instead, but `full` cannot be
 combined with another scope.
+
+### 4.1 Facts and declared branches (format 0.2)
+
+A fact is a threshold on one measured position of a completed **main** step:
+
+```yaml
+facts:
+  joint1_moved:
+    from_step: approach-j1
+    measured:
+      index: 0
+      at_least_rad: 0.02
+```
+
+- `from_step` must name a main step, not a branch step.
+- `measured.index` is a zero-based index into `MotionResult.measured_positions`.
+  The v0.1 gateway contract is positional: it carries no joint names and no
+  gripper measurement. A fact over a named joint or the gripper needs a
+  contract change; until then, recipe authors must use the profile order.
+- At least one of `at_least_rad` / `at_most_rad` is required; both may be set.
+- A fact is `TRUE`/`FALSE` only when the source step completed with a verified
+  bus read and the index exists. Missing, unverified or out-of-range input is
+  `UNKNOWN`, which never selects a branch.
+
+A branch is a declared alternative anchored after a main step:
+
+```yaml
+branches:
+  - id: adjust-j1.v1
+    after: approach-j1
+    required: false
+    priority: 10
+    when:
+      - fact: joint1_moved
+        equals: true
+    steps:
+      - name: adjust-j1
+        kind: JOINT_STEP
+        profile: step
+        scopes: [arm]
+        params: { ... }
+```
+
+- `id` matches `^[a-z0-9][a-z0-9.-]{0,63}$` and is unique.
+- `after` names a main step; a branch cannot anchor on another branch.
+- `when` is a non-empty list of `{fact, equals}`; every named fact must be
+  declared and measured at or before the anchor.
+- Branch step names are unique across the main plan and every branch. Branch
+  steps get their own idempotency keys (`branch_id`, `branch_index`) and their
+  scopes join the recipe scope union, so the operator authorization must cover
+  them.
+- Selection happens only after the anchor step returns `CONTINUE`; an execution
+  failure stops the run before any branch is considered. All conditions must be
+  `PASS`; the selector orders eligible branches by `(-priority, id)` and records
+  every candidate and guard.
+- `required: true` with no eligible candidate aborts the run with one stop (the
+  linear-engine approximation of `WAITING_FOR_OPERATOR`). `required: false`
+  continues the main plan.
+- The tree engine refuses a recipe with `facts`/`branches` until branch support
+  lands; use the default linear engine.
+- A Derived Plan is a new recipe revision, run id and authorization; it is never
+  a mutation of a live plan.
+
+See [`recipes/example-declared-branch.yaml`](../recipes/example-declared-branch.yaml).
 
 ## 5. Bus verification
 

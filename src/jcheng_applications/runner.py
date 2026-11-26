@@ -19,15 +19,16 @@ from typing import Callable
 
 from .core.classify import Decision
 from .core.command import build_command  # re-exported for callers and tests
-from .core.executor import StepExecutor
+from .core.executor import StepExecutor, StepOutcome
 from .core.preflight import (
     check_authorization,
     check_contract,
     check_lease,
     check_safety,
 )
-from .core.report import StepReport  # re-exported for callers and tests
+from .core.report import SelectionRecord, StepReport  # re-exported for callers and tests
 from .core.stop import StopOnce
+from .core.strategy import select_branch
 from .model import Authorization, Recipe, build_plan
 
 
@@ -56,6 +57,7 @@ class RunReport:
     steps: tuple[StepReport, ...]
     abort_reason: str | None
     stop_error: str | None
+    selections: tuple[SelectionRecord, ...] = ()
 
 
 def _utcnow() -> datetime:
@@ -80,6 +82,7 @@ def make_report(
     steps: tuple[StepReport, ...],
     abort_reason: str | None,
     stop_error: str | None,
+    selections: tuple[SelectionRecord, ...] = (),
 ) -> RunReport:
     """Assemble a report without inferring or interpolating a value."""
 
@@ -96,6 +99,7 @@ def make_report(
         steps=steps,
         abort_reason=abort_reason,
         stop_error=stop_error,
+        selections=selections,
     )
 
 
@@ -179,21 +183,58 @@ class TaskRunner:
         executor = StepExecutor(self._gateway)
         stop_once = StopOnce()
         step_reports: list[StepReport] = []
+        selections: list[SelectionRecord] = []
+        main_outcomes: dict[str, StepOutcome] = {}
         state = RunState.SUCCEEDED
         abort_reason: str | None = None
 
         for step in plan.steps:
             outcome = executor.submit(step, run_id=run_id, lease_id=lease_id)
             step_reports.append(outcome.report)
-            if outcome.decision is Decision.CONTINUE:
+            if outcome.decision is not Decision.CONTINUE:
+                state = {
+                    Decision.FAILED: RunState.FAILED,
+                    Decision.ABORTED: RunState.ABORTED,
+                    Decision.INDETERMINATE: RunState.INDETERMINATE,
+                }[outcome.decision]
+                abort_reason = outcome.reason
+                break
+            main_outcomes[step.name] = outcome
+
+            record, branch = select_branch(plan, step.name, main_outcomes)
+            if record is None:
                 continue
-            state = {
-                Decision.FAILED: RunState.FAILED,
-                Decision.ABORTED: RunState.ABORTED,
-                Decision.INDETERMINATE: RunState.INDETERMINATE,
-            }[outcome.decision]
-            abort_reason = outcome.reason
-            break
+            selections.append(record)
+            if branch is None:
+                if any(
+                    candidate.after == step.name and candidate.required
+                    for candidate in plan.branches
+                ):
+                    state = RunState.ABORTED
+                    abort_reason = (
+                        f"required branch after {step.name!r} has no eligible "
+                        "candidate"
+                    )
+                    break
+                continue
+
+            failed = False
+            for branch_step in branch.steps:
+                branch_outcome = executor.submit(
+                    branch_step, run_id=run_id, lease_id=lease_id
+                )
+                step_reports.append(branch_outcome.report)
+                if branch_outcome.decision is not Decision.CONTINUE:
+                    state = {
+                        Decision.FAILED: RunState.FAILED,
+                        Decision.ABORTED: RunState.ABORTED,
+                        Decision.INDETERMINATE: RunState.INDETERMINATE,
+                    }[branch_outcome.decision]
+                    abort_reason = branch_outcome.reason
+                    failed = True
+                    break
+            if failed:
+                break
 
         if state is not RunState.SUCCEEDED and step_reports:
             stop_once.request(self._gateway, abort_reason or state.value)
@@ -208,6 +249,7 @@ class TaskRunner:
             steps=tuple(step_reports),
             abort_reason=abort_reason,
             stop_error=stop_once.error,
+            selections=tuple(selections),
         )
 
     def _report(
@@ -222,6 +264,7 @@ class TaskRunner:
         steps: tuple[StepReport, ...],
         abort_reason: str | None,
         stop_error: str | None,
+        selections: tuple[SelectionRecord, ...] = (),
     ) -> RunReport:
         return make_report(
             recipe=recipe,
@@ -234,4 +277,5 @@ class TaskRunner:
             steps=steps,
             abort_reason=abort_reason,
             stop_error=stop_error,
+            selections=selections,
         )

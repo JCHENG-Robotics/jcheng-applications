@@ -6,8 +6,9 @@
 > gateway and hardware remain M4. The task-engine design is **In progress** in
 > [`docs/TASK_ENGINE.md`](docs/TASK_ENGINE.md); M1.5 extracted the Shared
 > Execution Core and added an opt-in py_trees engine with an independent Run
-> Supervisor. The default remains linear and py_trees is an optional extra
-> pending licence review.
+> Supervisor. S3 v0 declared branches and a three-valued selector run on the
+> linear engine with positional arm facts. The default remains linear and
+> py_trees is an optional extra pending licence review.
 
 ## Current state
 
@@ -24,7 +25,7 @@
 | Supervised execution of one recipe through a gateway | Complete, mock/L3 (2026-11-26) | `src/jcheng_applications/write_transport.py`; `supervised.py`; `evidence/20261126_m3_supervised/` |
 | Shared Execution Core | Complete, local (2026-11-26); T-C06 partially verified | `src/jcheng_applications/core/`; `tests/test_core.py`; `evidence/20261126_shared_core/` |
 | Production tree runtime and Run Supervisor | Complete, opt-in (2026-11-26) | `src/jcheng_applications/tree/`; `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/` |
-| Declared branches, three-valued guards and selection records | Planned (S3) | — |
+| Declared branches, three-valued guards and selection records | In progress: linear engine, positional arm facts (2026-11-26) | `tests/test_branches.py`; `evidence/20261126_s3_branches/` |
 | Hardware acceptance | Not started | — |
 
 ## Milestones
@@ -36,7 +37,7 @@
 | M1.5 | Isolated task-engine technical validation (parallel, does not gate M2) | In progress (local, 2026-11-26) | The Shared Execution Core is extracted and both drivers call it. The opt-in py_trees engine and independent Run Supervisor are built: one in-flight step, deadline/cancel/one-stop, L3 tree run, and an 11-case failure differential. The default remains linear; py_trees is an optional `tree` extra with the licence review open. T-C06 is verified: 12 cases produce an exact `RunReport` match | `src/jcheng_applications/tree/`; `tests/test_tree_runtime.py`; `tests/test_tree_regression.py`; `evidence/20261126_m1_5_tree/`; `evidence/20261126_t_c06/`; `docs/M1_5_VALIDATION.md` |
 | M2 | Read-only gateway client and admission | Complete (2026-11-26) | The client implements `GET /v1/health`, `/v1/contract`, `/v1/state` and `/v1/safety` with bounded timeouts, GET-only behavior, no retry and no fallback; contract-mismatch and unreachable refusal are tested against a loopback mock. CI `applications-gate` passed | `src/jcheng_applications/transport.py`; `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | M3 | Supervised execution of one recipe | Complete, mock/L3 (2026-11-26) | A session-bound run acquires and releases the system lease, submits one recipe with stable idempotency keys, honours stop and pre-emption, and produces a persisted hash-chained run report; proven against the real `jcheng-system` gateway process with `MockStack` (L3), no robot. The deployed gateway still needs C1–C5 before M4, and `JOINT_STEP` is single-joint in the system profile | `src/jcheng_applications/write_transport.py`, `lease.py`, `runstore.py`, `supervised.py`; `evidence/20261126_m3_supervised/` |
-| S3 | Declared branches and strategy selection (parallel after M3) | Planned | A recipe with declared facts and branches validates; branch scopes join the authorization union; the selector is three-valued, deterministic and cannot read execution outcomes; a required branch with no candidate enters `WAITING_FOR_OPERATOR`; a Derived Plan needs a new version, run id and authorization; proven against a mock gateway (L2), no robot | — |
+| S3 | Declared branches and strategy selection (parallel after M3) | In progress: v0 on the linear engine (2026-11-26) | A recipe with declared facts and branches validates; branch scopes join the authorization union; the selector is three-valued, deterministic and never reads execution outcomes; an optional branch continues and a required branch with no candidate is `ABORTED` + one stop; positional arm facts are verified L3 against the mock gateway. A live `WAITING_FOR_OPERATOR`, named/gripper facts, tree branch execution and a Derived Plan registry remain open | `tests/test_branches.py`; `recipes/example-declared-branch.yaml`; `evidence/20261126_s3_branches/` |
 | M4 | Supervised hardware acceptance | Planned | Every motion session is separately authorized; the system layer applies the lease, limits and stop latch; L5 evidence is recorded alongside the system layer's own | — |
 
 ### P0 resolution (2026-11-26)
@@ -63,9 +64,9 @@ the mock without any workaround.
    single-joint `JOINT_STEP` constraint in `RECIPES.md`, obtain R5
    (`StopResult` confirmation levels), and run C1–C5 on the deployed
    `armpi_debug_gateway`.
-3. **S3 — declared branches and selection.** Add the recipe `facts`/`branches`
-   extension, three-valued guards, the deterministic selector and the Derived
-   Plan rules. Mock gateway only.
+3. **S3 residuals.** v0 is on the linear engine. Remaining: tree branch
+   execution, a live `WAITING_FOR_OPERATOR`, named/gripper facts after the
+   `jcheng-interfaces` review, and a Derived Plan identity registry.
 4. **M4 — supervised hardware acceptance.** One separately authorized session
    with the system layer's lease, limits and stop latch; L5 evidence.
 

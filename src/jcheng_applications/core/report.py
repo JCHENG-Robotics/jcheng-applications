@@ -18,3 +18,23 @@ class StepReport:
     idempotency_key: str
     bus_verified: bool | None
     safety_state: str | None
+    measured_positions: tuple[float, ...] | None = None
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """One declared branch considered at a selection point."""
+
+    branch_id: str
+    guard: str
+    selected: bool
+
+
+@dataclass(frozen=True)
+class SelectionRecord:
+    """The deterministic selection result for one anchor step."""
+
+    after_step: str
+    candidates: tuple[Candidate, ...]
+    selected: str | None
+    reason: str | None = None

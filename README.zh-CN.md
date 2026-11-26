@@ -6,7 +6,8 @@
 > 准入骨架加任务编排核心：配方校验、确定性规划、面向抽象网关端口的失败关闭
 > 运行器、M2 只读传输，以及 M3 面向 mock 网关的受监督 `run`。共享执行核心
 > 已抽取；M1.5 py_trees 引擎与独立 Run Supervisor 作为可选 `--engine tree`
-> 提供，默认仍是 linear。不使用硬件，也不在机器人上运行。
+> 提供。S3 v0 的声明分支与三值选择器在线性引擎上使用位置索引 arm 事实。
+> 默认仍是 linear。不使用硬件，也不在机器人上运行。
 > 本文为英文主文档的中文对照；如有歧义，以英文版为准。
 
 `jcheng-applications` 是 JCHENG 生态的 L4 任务编排应用。它把操作员编写的配方
@@ -52,7 +53,8 @@ jcheng-applications/
 │   ├── TASK_ENGINE.md              # 设计：树执行器、监督器与策略选择
 │   └── M1_5_VALIDATION.md          # py_trees 隔离技术验证报告
 ├── recipes/
-│   └── example-supervised-transfer.yaml  # 离线示例；不是硬件程序
+│   ├── example-supervised-transfer.yaml  # v0.1 离线示例；不是硬件程序
+│   └── example-declared-branch.yaml      # v0.2 facts/分支示例；mock 尺寸值
 ├── src/jcheng_applications/
 │   ├── model.py                    # 配方模型、契约常量与规划器
 │   ├── gateway.py                  # GatewayPort 协议与契约解析
@@ -73,6 +75,7 @@ jcheng-applications/
 ├── evidence/20261126_m3_supervised/# M3 L3 受监督运行证据
 ├── evidence/20261126_m1_5_tree/    # M1.5 树引擎 L3 证据
 ├── evidence/20261126_t_c06/        # T-C06 完整 RunReport 对齐证据
+├── evidence/20261126_s3_branches/  # S3 声明分支 L3 证据
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -145,6 +148,7 @@ DDS，也不自行执行运动。
 | 只读网关准入：四项 GET、有界超时、不重试、拒绝契约/鉴权/格式错误 | 已验证（L2，2026-11-26） | `tests/test_transport.py`；`evidence/20261126_m2_transport/`；[CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | Shared Execution Core；线性与树引擎 | 已验证（L2，2026-11-26） | `tests/test_core.py`；T-C06 12 例完整 `RunReport` 对齐；`evidence/20261126_shared_core/`、`evidence/20261126_t_c06/` |
 | 可选 py_trees 引擎 + 独立 deadline/cancel/stop 监督器 | 已验证（L2/L3，2026-11-26） | `tests/test_tree_runtime.py`；`evidence/20261126_m1_5_tree/`；py_trees 非默认；许可证审查未关闭 |
+| 声明分支 + 位置索引 arm 事实 + 三值选择器（线性引擎） | 已验证（L1–L3，2026-11-26） | `tests/test_branches.py`；`evidence/20261126_s3_branches/`；命名/gripper 事实与树分支待补 |
 | 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
 | 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
 | 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |

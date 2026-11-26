@@ -8,6 +8,24 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- S3 v0 declared branches (recipe format 0.2, additive): optional `facts` and
+  `branches`. A fact is a threshold on a positional
+  `MotionResult.measured_positions[index]` from a main step and is
+  three-valued; a branch is anchored after a main step with structured
+  `{fact, equals}` conditions.
+- Plan compilation gives branch steps their own `branch_id`/`branch_index`
+  keys and a global report index; branch scopes join the recipe scope union.
+  `Plan` carries `facts` and `branches`; the CLI `plan` output includes them.
+- `core/facts.py` and `core/strategy.py`: fail-closed fact evaluation and a
+  deterministic selector ordered by `(-priority, id)`. A selection record lists
+  every candidate and guard; execution failure never evaluates a branch.
+- The linear runner executes declared branches after a `CONTINUE` anchor,
+  including `required` handling (`ABORTED` + one stop when no candidate) and a
+  branch-step failure path. `RunReport` carries selection records; the run
+  store persists them and `measured_positions`.
+- `recipes/example-declared-branch.yaml`, `tests/test_branches.py` and
+  `evidence/20261126_s3_branches/`: L3 against the real system mock gateway
+  (fact `index 0=0.03`, guard `PASS`, branch selected, 2/2 steps).
 - M1.5 opt-in production tree engine: `src/jcheng_applications/tree/runtime.py`
   runs a `py_trees` `Sequence` over the shared `StepExecutor` with one daemon
   worker (one in-flight step), a `StepLog` that separates completed and late
@@ -79,6 +97,11 @@ All notable changes to this project are documented here. Format based on
 
 ### Changed
 
+- S3 v0 runs on the linear engine. The tree engine refuses a facts/branches
+  recipe until branch support lands. Facts are positional arm positions only;
+  named-joint and gripper facts need a `jcheng-interfaces` change (proposal
+  filed). A required branch with no candidate is `ABORTED` + one stop, not a
+  live `WAITING_FOR_OPERATOR`.
 - The default execution engine stays linear. The py_trees engine is opt-in and
   the `LICENSE-REVIEW.md` review of py_trees/pydot/pyparsing remains open; the
   engine is not promoted to the default in this change.
