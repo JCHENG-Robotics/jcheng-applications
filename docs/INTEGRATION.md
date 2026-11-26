@@ -48,7 +48,7 @@ is no second path: no SSH, no vendor SDK, no ROS topic, no serial device.
 | Lease | `POST /v1/leases` acquires a client reference, `POST /v1/leases/{id}/renew` renews at `ttl/3`, `DELETE /v1/leases/{id}` releases. The system layer owns the lease and may revoke it |
 | Intent validation | `POST /v1/motion/validate` for a dry validation when M2 needs it |
 | Intent submission | `POST /v1/motion/execute` with the `Idempotency-Key` header; the gateway and system layer perform the motion. M3 refuses a gateway without the `mock` capability |
-| Stop | `POST /v1/motion/stop` after a failed or indeterminate submission |
+| Stop | `POST /v1/motion/stop` after a failed or indeterminate submission; the response is parsed into a `StopReceipt`. A legacy response is S1 only; S2 requires `confirmation: backend_confirmed`; `physical_stop` is always `unverified` |
 | Events | `GET /v1/events` and the WebSocket envelope for state, safety, lease and motion events |
 | Ports | Deployment detail, not contract; the adapter reads the configured URL and assumes nothing |
 | Middleware | No DDS, no RMW, no `CYCLONEDDS_URI`. HTTP/WS only |
@@ -122,7 +122,7 @@ flight when the supervisor halts becomes `UNKNOWN` and the run is
 | `MotionResult.outcome = ABORTED` | `ABORTED`; one stop request |
 | `MotionResult.outcome = TIMEOUT` or `UNKNOWN` | `INDETERMINATE`; one stop request |
 | `COMPLETED` without `bus_verified` for arm/gripper/full | `INDETERMINATE`; one stop request |
-| Stop path fails | run state preserved; `stop_error` recorded; `operator_required` set; exit 3 |
+| Stop path fails | run state preserved; `stop_error` recorded; `stop_confirmation`/`physical_stop` stay `None`; `operator_required` set; exit 3 |
 | Unconfirmed/aborted outcome, lease loss or required branch with no candidate | `operator_required` set; exit 3; no motion authority |
 | Run record cannot be written | The report is still returned; `record_error` is set and `run` exits 2; the motion may have happened |
 
@@ -150,6 +150,7 @@ operator runbook.
 | v0.1.0 admission and offline core | `python3 -m pytest -q`; `bash scripts/check_repo_gate.sh` |
 | M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI `applications-gate` passed |
 | M3 supervised execution | Real `jcheng-system` gateway process + `MockStack` on loopback (L3, 2026-11-26): lease acquire/release, 3/3 steps, stop-on-rejection, hash-chained record. No robot. Evidence: `evidence/20261126_m3_supervised/` |
+| Stop confirmation receipt | Optional R5 fields parsed on both engines (L1, 2026-11-26): absent → S1, explicit `backend_confirmed` → S2, `physical_stop` only `unverified`, stop failure → no level. Evidence: `tests/test_stop_confirmation.py` |
 | M1.5 tree engine | Opt-in `--engine tree` against the same system mock gateway (L3, 2026-11-26): 3/3 steps, lease released; L2 deadline/rejection/one-stop tests. Evidence: `evidence/20261126_m1_5_tree/` |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 

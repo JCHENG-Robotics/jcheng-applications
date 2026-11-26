@@ -20,8 +20,9 @@
 > M2, M3, the M1.5 tree engine and S3 v0 are implemented on the mock. L3
 > evidence: `evidence/20261126_m3_supervised/`,
 > `evidence/20261126_m1_5_tree/` and `evidence/20261126_s3_branches/` (real
-> `jcheng-system` gateway process + `MockStack`, no robot). The deployed
-> gateway must still pass C1–C5 and R5 before M4. No hardware execution is opened before M4, and every M4 session needs
+> `jcheng-system` gateway process + `MockStack`, no robot). The client records
+> S1/S2 stop confirmation when the gateway provides it; the R5 schema review is
+> still pending. The deployed gateway must still pass C1–C5 and R5 before M4. No hardware execution is opened before M4, and every M4 session needs
 > separate, explicit operator authorization. Offline evidence and hardware
 > evidence are never mixed.
 
@@ -291,6 +292,25 @@ Consequences:
   probe is exactly this case.
 - The supervisor's `stop_error` is about S1/S2 only. A failed stop request is
   recorded as failed; it is never reported as a successful physical stop.
+
+**Implementation (2026-11-26).** The client parses the optional R5 fields from
+`POST /v1/motion/stop` as `StopReceipt` (`write_transport.py`):
+
+- A legacy response with `accepted: true` and no R5 fields records S1
+  (`request_accepted`) and `physical_stop: unverified`.
+- S2 is recorded **only** when the gateway explicitly returns
+  `confirmation: backend_confirmed`. HTTP 200, `accepted` and the safety latch
+  never imply S2.
+- `physical_stop` must be absent or `unverified`; any other value is a protocol
+  error, so the app cannot record an unmeasurable claim.
+- A failed request records `stop_error` with both levels `None`; a run with no
+  stop records both as `None`.
+- `RunReport.stop_confirmation` / `RunReport.physical_stop` are persisted in the
+  hash-chained run record and printed by the CLI. Both the linear and tree
+  drivers use the same parser and the T-C06 parity suite covers the fields.
+- The proposal is not yet in the schema; this is client-side, forward-compatible
+  support. No schema, tag or contract hash changed. Tests:
+  `tests/test_stop_confirmation.py`.
 
 ## 8. Plan compilation, declared branches and Derived Plans
 
@@ -719,6 +739,7 @@ State is `Planned` for every row; this document does not claim a pass.
 | T-D07 | Contract mismatch, safety not `ARMED_IDLE`, missing lease | Zero submissions and zero stops | L2 |
 | T-D08 | Stop raises | `stop_error` recorded, run state preserved | L2 |
 | T-D09 | Extra ticks while a leaf is `RUNNING` | Tick count does not change the call log | L2 |
+| T-D10 | Stop receipt: legacy, explicit S2, invalid fields, stop failure, no stop | S1/S2 recorded exactly; physical only `unverified`; no level on failure; both engines agree | L1/L2 |
 
 ### 16.4 Supervisor and concurrency
 
@@ -854,6 +875,7 @@ result.
 - [`../evidence/20261126_s3_tree/`](../evidence/20261126_s3_tree/README.md) — S3 tree-engine L3 and branch parity evidence.
 - [`../evidence/20261126_waiting/`](../evidence/20261126_waiting/README.md) — WAITING_FOR_OPERATOR evidence.
 - [`../evidence/20261126_derived_plan/`](../evidence/20261126_derived_plan/README.md) — Derived Plan identity guard evidence.
+- [`../evidence/20261126_stop_confirmation/`](../evidence/20261126_stop_confirmation/README.md) — S1/S2 stop-receipt evidence (client-side; R5 schema pending).
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.

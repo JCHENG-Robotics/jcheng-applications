@@ -27,6 +27,7 @@ from ..core.preflight import (
     check_safety,
 )
 from ..core.report import SelectionRecord, StepReport
+from ..core.stop import receipt_fields
 from ..core.strategy import select_branch
 from ..model import Authorization, Plan, PlanStep, Recipe
 from ..runner import RunReport, RunState, make_report
@@ -116,6 +117,7 @@ class RunSupervisor:
         self._reason: str | None = None
         self._issued = False
         self.stop_error: str | None = None
+        self.stop_receipt: object | None = None
         self._thread = threading.Thread(
             target=self._run, name="m1-5-supervisor", daemon=True
         )
@@ -157,7 +159,7 @@ class RunSupervisor:
             reason = self._reason or "stopped"
         self._halt.set()
         try:
-            self._stop_sink(reason)
+            self.stop_receipt = self._stop_sink(reason)
         except Exception as exc:  # noqa: BLE001 - recorded, never hidden
             self.stop_error = f"{type(exc).__name__}: {exc}"
         finally:
@@ -517,6 +519,7 @@ def run_tree(
     if supervisor.stop_error is not None:
         operator_required = True
         operator_reason = f"stop request failed: {supervisor.stop_error}"
+    stop_confirmation, physical_stop = receipt_fields(supervisor.stop_receipt)
 
     return make_report(
         recipe=recipe,
@@ -532,4 +535,6 @@ def run_tree(
         selections=tuple(selections),
         operator_required=operator_required,
         operator_reason=operator_reason,
+        stop_confirmation=stop_confirmation,
+        physical_stop=physical_stop,
     )

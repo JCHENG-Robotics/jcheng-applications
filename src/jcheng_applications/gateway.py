@@ -56,6 +56,30 @@ class ContractInfo:
     system_version: str
 
 
+STOP_CONFIRMATION_REQUEST_ACCEPTED = "request_accepted"
+STOP_CONFIRMATION_BACKEND_CONFIRMED = "backend_confirmed"
+STOP_CONFIRMATIONS = frozenset(
+    {STOP_CONFIRMATION_REQUEST_ACCEPTED, STOP_CONFIRMATION_BACKEND_CONFIRMED}
+)
+PHYSICAL_STOP_UNVERIFIED = "unverified"
+
+
+@dataclass(frozen=True)
+class StopReceipt:
+    """What a stop request established.
+
+    ``confirmation`` is S1 (``request_accepted``) or S2 (``backend_confirmed``)
+    only. The platform cannot measure a physical stop, so ``physical_stop`` is
+    always ``unverified``. Missing optional fields default to S1: HTTP 200 plus
+    ``accepted: true`` proves the request was accepted, nothing more.
+    """
+
+    accepted: bool
+    confirmation: str
+    physical_stop: str
+    message: str
+
+
 @dataclass(frozen=True)
 class SafetySnapshot:
     """The subset of ``SafetyState`` the orchestrator decides on."""
@@ -100,8 +124,12 @@ class GatewayPort(Protocol):
     def submit(self, command: Mapping[str, Any]) -> MotionResult:
         """Submit one ``MotionCommand`` and return its terminal result."""
 
-    def stop(self, reason: str) -> None:
-        """Request a software stop after a failed or indeterminate step."""
+    def stop(self, reason: str) -> StopReceipt | None:
+        """Request a software stop after a failed or indeterminate step.
+
+        Return the gateway receipt when the adapter can provide one. ``None``
+        means the adapter reports no confirmation; it is never read as S2.
+        """
 
 
 def _mapping(value: Any, where: str) -> Mapping[str, Any]:
@@ -239,6 +267,45 @@ def motion_result_from_mapping(payload: Any) -> MotionResult:
         safety_state=safety_state,
         stop_latched=stop_latched,
         measured_positions=measured_positions,
+    )
+
+
+def stop_receipt_from_mapping(payload: Any) -> StopReceipt:
+    """Parse a ``POST /v1/motion/stop`` response.
+
+    The R5 fields are optional until the contract review closes:
+
+    - ``confirmation`` absent means S1; it may never be inferred as S2.
+    - ``physical_stop`` must be absent or ``unverified``; any other value is a
+      protocol error, because the platform cannot measure a physical stop.
+    """
+
+    root = _mapping(payload, "stop")
+    accepted = _bool(root.get("accepted"), "stop.accepted")
+    if accepted is not True:
+        raise GatewayProtocolError("stop: gateway did not accept the request")
+
+    confirmation = root.get("confirmation", STOP_CONFIRMATION_REQUEST_ACCEPTED)
+    if not isinstance(confirmation, str) or confirmation not in STOP_CONFIRMATIONS:
+        raise GatewayProtocolError(
+            "stop.confirmation: must be request_accepted or backend_confirmed"
+        )
+
+    physical_stop = root.get("physical_stop", PHYSICAL_STOP_UNVERIFIED)
+    if physical_stop != PHYSICAL_STOP_UNVERIFIED:
+        raise GatewayProtocolError(
+            "stop.physical_stop: must be unverified; a physical stop is not "
+            "measurable on this platform"
+        )
+
+    message = root.get("message", "")
+    if not isinstance(message, str):
+        raise GatewayProtocolError("stop.message: must be a string")
+    return StopReceipt(
+        accepted=accepted,
+        confirmation=confirmation,
+        physical_stop=physical_stop,
+        message=message,
     )
 
 

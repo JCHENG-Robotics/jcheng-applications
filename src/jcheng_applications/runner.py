@@ -27,7 +27,7 @@ from .core.preflight import (
     check_safety,
 )
 from .core.report import SelectionRecord, StepReport  # re-exported for callers and tests
-from .core.stop import StopOnce
+from .core.stop import StopOnce, receipt_fields
 from .core.strategy import select_branch
 from .model import Authorization, Recipe, build_plan
 
@@ -60,6 +60,8 @@ class RunReport:
     selections: tuple[SelectionRecord, ...] = ()
     operator_required: bool = False
     operator_reason: str | None = None
+    stop_confirmation: str | None = None
+    physical_stop: str | None = None
 
 
 def _utcnow() -> datetime:
@@ -87,6 +89,8 @@ def make_report(
     selections: tuple[SelectionRecord, ...] = (),
     operator_required: bool = False,
     operator_reason: str | None = None,
+    stop_confirmation: str | None = None,
+    physical_stop: str | None = None,
 ) -> RunReport:
     """Assemble a report without inferring or interpolating a value."""
 
@@ -106,6 +110,8 @@ def make_report(
         selections=selections,
         operator_required=operator_required,
         operator_reason=operator_reason,
+        stop_confirmation=stop_confirmation,
+        physical_stop=physical_stop,
     )
 
 
@@ -258,8 +264,11 @@ class TaskRunner:
             if failed:
                 break
 
+        stop_confirmation: str | None = None
+        physical_stop: str | None = None
         if state is not RunState.SUCCEEDED and step_reports:
             stop_once.request(self._gateway, abort_reason or state.value)
+            stop_confirmation, physical_stop = receipt_fields(stop_once.receipt)
             if stop_once.error is not None:
                 operator_required = True
                 operator_reason = f"stop request failed: {stop_once.error}"
@@ -277,6 +286,8 @@ class TaskRunner:
             selections=tuple(selections),
             operator_required=operator_required,
             operator_reason=operator_reason,
+            stop_confirmation=stop_confirmation,
+            physical_stop=physical_stop,
         )
 
     def _report(
@@ -294,6 +305,8 @@ class TaskRunner:
         selections: tuple[SelectionRecord, ...] = (),
         operator_required: bool = False,
         operator_reason: str | None = None,
+        stop_confirmation: str | None = None,
+        physical_stop: str | None = None,
     ) -> RunReport:
         return make_report(
             recipe=recipe,
@@ -309,4 +322,6 @@ class TaskRunner:
             selections=selections,
             operator_required=operator_required,
             operator_reason=operator_reason,
+            stop_confirmation=stop_confirmation,
+            physical_stop=physical_stop,
         )

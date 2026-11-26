@@ -185,6 +185,8 @@ def _run(args: argparse.Namespace) -> int:
                 "state": result.report.state.value,
                 "operator_required": result.report.operator_required,
                 "operator_reason": result.report.operator_reason,
+                "stop_confirmation": result.report.stop_confirmation,
+                "physical_stop": result.report.physical_stop,
                 "steps": [
                     {
                         "index": step.index,

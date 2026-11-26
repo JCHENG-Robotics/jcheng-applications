@@ -9,7 +9,10 @@
 > The Shared Execution Core is extracted. An opt-in py_trees engine and an
 > independent Run Supervisor are implemented (`--engine tree`); the default is
 > still the linear engine, and py_trees is an optional extra pending licence
-> review. Strategy selection and declared branches remain design-only.
+> review. Declared branches and the three-valued selector are implemented on
+> both engines with positional arm facts. The client records S1/S2 stop
+> confirmation from the optional R5 receipt fields; the schema review is
+> pending and a physical stop is never claimed.
 
 ## 1. Position in the ecosystem
 
@@ -64,9 +67,9 @@ Rules that come from the ecosystem and are not negotiable here:
 | Run Supervisor (M1.5) | Operator laptop, own thread | Run deadline, cancellation and the one stop, independent of the tree loop | Driving the tree, renewing or owning the lease |
 | Gateway port | Operator laptop, abstract | The only path to the robot; M2 reads and M3 writes go through it | Device, ROS, SSH or vendor-SDK access |
 | Read-only transport (M2) | Operator laptop, in process | `GET /v1/health`, `/contract`, `/state` and `/safety` with bounded timeouts and strict parsing | POST, submission, stop, lease mutation, retry |
-| Write transport (M3) | Operator laptop, in process | Lease acquire/renew/release, one execute per step, one stop; refuses a non-mock gateway | Retry, redirect, non-mock submission, device access |
+| Write transport (M3) | Operator laptop, in process | Lease acquire/renew/release, one execute per step, one stop; parses the stop receipt (S1/S2, physical `unverified`); refuses a non-mock gateway | Retry, redirect, non-mock submission, device access, inferring S2 from HTTP 200 |
 | Lease session | Operator laptop, in process | Acquire before the first submission, renew at `ttl/3`, release on every terminal path | Holding safety authority; retrying a lost lease |
-| Run store | Operator laptop, file | Append-only, hash-chained JSONL outside the repository, mode 0600 | Tokens, raw lease ids, recordings in git |
+| Run store | Operator laptop, file | Append-only, hash-chained JSONL outside the repository, mode 0600; includes stop confirmation levels | Tokens, raw lease ids, recordings in git |
 | Supervised run | Operator laptop, in process | Compose lease + runner + record for one recipe | Executing motion itself or bypassing the preflight |
 | Derived-plan guard | Operator laptop, in process | Require a verified predecessor, new recipe version, new run id and new authorization before any gateway call | Mutating a live plan, resuming an old run or widening authorization |
 | Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code, intent identity, selection records and the terminal `operator_required` flag per run | Relabelling a mock result as hardware, persisting secrets, granting motion authority |
@@ -146,6 +149,7 @@ submission is then rejected and the run fails closed.
 | The Run Supervisor owns deadline/cancel/one-stop on its own thread | `tree/runtime.py`; `tests/test_tree_runtime.py` |
 | Explicit per-session authorization | `Authorization` validation before any gateway call |
 | No fabricated result | terminal outcome copied from the gateway; unknown stays unknown |
+| Stop confirmation is not upgraded | `StopReceipt` parser: absent R5 fields are S1, S2 requires `backend_confirmed`, `physical_stop` only `unverified`; `tests/test_stop_confirmation.py` |
 | No secrets or run data in git | gate scan; `.gitignore`; review |
 | Fail closed | refusal is the default; ambiguity stops the run |
 
@@ -168,7 +172,7 @@ submission is then rejected and the run fails closed.
 | `ABORTED` terminal result | `ABORTED`; one stop request |
 | `TIMEOUT` or `UNKNOWN` terminal result | `INDETERMINATE`; one stop request; operator inspection |
 | `COMPLETED` without `bus_verified` on an arm/gripper/full step | `INDETERMINATE`; one stop request |
-| Stop request fails | run state preserved; `stop_error` recorded; `operator_required` set; exit 3 |
+| Stop request fails | run state preserved; `stop_error` recorded; no S1/S2 level; `operator_required` set; exit 3 |
 | Unconfirmed/aborted outcome, lease loss or required branch with no candidate | `operator_required` and `operator_reason` set; exit 3; no motion authority |
 | Clean `REJECTED`/`FAILED` or preflight refusal | `operator_required` stays false; exit 1 (or 2 for a record failure) |
 | Malformed gateway payload | `INDETERMINATE`; one stop request |

@@ -5,7 +5,8 @@
 > Operator: JerichoCheng. Reviewer: pending.
 > Scope: repository scaffold, offline orchestration core, M2 read-only transport,
 > M3 supervised run against the real system mock gateway, and the S3
-> branch/tree/WAITING/derived-plan features.
+> branch/tree/WAITING/derived-plan features, plus client-side stop-confirmation
+> receipts (S1/S2 only; physical stop never claimed).
 > No hardware is used, no deployed gateway is contacted and no robot motion is
 > claimed.
 
@@ -14,8 +15,8 @@
 | Gate | Command | Level | Result | Evidence |
 |---|---|---|---|---|
 | Repository gate | `bash scripts/check_repo_gate.sh` | L0 | pass | local, 2026-11-26 |
-| Unit tests (with tree extra) | `python3 -m pytest -q` | L1 | pass (181 tests) | `tests/` |
-| Unit tests (default extras) | `python3 -m pytest -q` | L1 | pass (161 passed, 3 skipped) | `tests/` |
+| Unit tests (with tree extra) | `python3 -m pytest -q` | L1 | pass (197 tests) | `tests/` |
+| Unit tests (default extras) | `python3 -m pytest -q` | L1 | pass (175 passed, 5 skipped) | `tests/` |
 | Offline runner against a fake gateway | `pytest -q tests/test_runner.py` | L2 | pass | `tests/test_runner.py` |
 | M2 read-only transport | loopback mock gateway | L2 | pass (GET only, no retry, contract mismatch refusal) | `evidence/20261126_m2_transport/` |
 | M3 supervised run | real `jcheng-system` mock gateway + `MockStack` | L3 | pass (lease, idempotency, persisted hash-chained record) | `evidence/20261126_m3_supervised/` |
@@ -23,6 +24,7 @@
 | S3 declared branches — tree engine | exact linear/tree report parity | L3 | pass | `evidence/20261126_s3_tree/` |
 | WAITING_FOR_OPERATOR | both engines + loopback CLI | L2–L3 | pass (CLI exit 3, no motion authority) | `evidence/20261126_waiting/` |
 | Derived-plan guard | verified predecessor before any gateway call | L3 | pass (zero-request refusal) | `evidence/20261126_derived_plan/` |
+| Stop confirmation receipt | both engines; legacy/S1, explicit S2, failure, no stop | L1/L2 | pass (13 tests) | `tests/test_stop_confirmation.py` |
 | P0 C1–C5 (system dependency) | `jcheng-system` concurrency probe | L3 | pass (zero double terminals) | `jcheng-system/e2e/reports/20261126_concurrency_probe_r2/` |
 | Hardware | — | L5 | not run | — |
 
@@ -40,6 +42,7 @@
 | A terminal WAITING_FOR_OPERATOR reports exit 3 and grants no motion authority | L3 | `tests/test_waiting.py` |
 | `--derived-from` verifies the predecessor hash chain and requires a new recipe version, run id and authorization before any gateway call | L3 | `tests/test_derived.py` |
 | The system P0 C2 double-terminal failure is resolved on the mock (C1–C5, stress loop) | L3 | system probe evidence |
+| A legacy stop response records S1 only; S2 requires `backend_confirmed`; `physical_stop` is only `unverified`; a failed stop records no level | L1/L2 | `tests/test_stop_confirmation.py` |
 
 ## 3. Not verified
 
@@ -48,6 +51,7 @@
 | Deployed `armpi_debug_gateway` C1–C5 | Not probed | M4 cannot start until the deployed gateway repeats the contract |
 | Hardware execution | No L5 session | No real-arm or chassis claim |
 | Named/gripper facts | Requires a `jcheng-interfaces` proposal | Gripper-dependent branches cannot be expressed yet |
+| R5 stop confirmation in the contract | Proposal only; schema review pending | The client supports the optional fields, but a deployed gateway cannot be required to send S2 yet |
 | Live operator channel / resumption | Not implemented | WAITING is terminal; resumption is a new authorized run |
 | py_trees promotion | Optional extra; licence review open | Tree engine is not the default |
 | Operator authentication | Owned by `jcheng-studio` | This repository trusts the supplied authorization record |

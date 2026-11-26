@@ -158,6 +158,7 @@ DDS，也不自行执行运动。退出码：0 `SUCCEEDED`，1 `FAILED`/`ABORTED
 | 终态 `WAITING_FOR_OPERATOR`：`operator_required` + CLI 退出码 3，无运动权限 | 已验证（L2，2026-11-26） | `tests/test_waiting.py`；`evidence/20261126_waiting/`；实时接管通道未实现 |
 | Derived Plan 身份：前序记录校验、新 recipe 版本、新 run id、新授权会话，且在任何网关调用前拒绝 | 已验证（L1/L2，2026-11-26） | `tests/test_derived.py`；`evidence/20261126_derived_plan/` |
 | 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
+| 停止确认等级：旧响应仅为 S1；S2 必须由 `backend_confirmed` 明确确认；物理停止恒为 `unverified` | 已验证（L1/L2，2026-11-26） | `tests/test_stop_confirmation.py`；R5 schema 评审待完成 |
 | 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
 | 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |
 | 任何硬件行为 | 未验证 | 无 L5 会话；无运行时 |
