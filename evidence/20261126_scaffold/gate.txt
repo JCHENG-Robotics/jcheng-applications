@@ -1,0 +1,20 @@
+# jcheng-applications repository gate — 2026-11-26
+# host: Linux 7.0.0-43-generic x86_64, python 3.12.3, pytest 7.4.4
+# command: bash scripts/check_repo_gate.sh
+
+== tests
+........................................................................ [ 80%]
+.................                                                        [100%]
+89 passed in 0.18s
+Repository gate OK: document set, manifest, no LICENSE, no secrets, no weights, no run data, links resolve
+
+# extra check: capability.yaml against jcheng-interfaces capability-manifest.v1.schema.json
+capability.yaml validates against capability-manifest.v1.schema.json
+
+# extra check: offline CLI validate/plan
+$ PYTHONPATH=src python3 -m jcheng_applications validate recipes/example-supervised-transfer.yaml
+OK example-supervised-transfer 0.1.0: 2 step(s), scopes arm,gripper
+$ PYTHONPATH=src python3 -m jcheng_applications plan recipes/example-supervised-transfer.yaml --run-id evidence-001
+plan example-supervised-transfer 0.1.0 run=evidence-001 steps=2
+  00 approach: JOINT_STEP/step scopes=arm idem=abcc6803a1c8c7ee...
+  01 grasp: GRIPPER/gripper scopes=gripper idem=03f95b469999a122...

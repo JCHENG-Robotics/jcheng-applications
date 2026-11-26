@@ -1,0 +1,34 @@
+# Offline recipe example for validation, planning and unit tests.
+#
+# It is not a hardware program: the joint names are placeholders, the target
+# positions are uncalibrated and no operator session has authorized it. Do not
+# send it to a robot. A real recipe is written against a robot profile and a
+# calibration record, and is executed only through an authorized gateway
+# session under the system layer's lease, limits and stop latch.
+name: example-supervised-transfer
+version: 0.1.0
+description: >-
+  Two-step offline example: approach a joint pose, then close the gripper.
+  Placeholder values only; no calibrated target and no hardware authorization.
+contract_hash: "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42"
+scopes: [arm, gripper]
+steps:
+  - name: approach
+    kind: JOINT_STEP
+    profile: step
+    scopes: [arm]
+    params:
+      joint_names: [joint1, joint2, joint3, joint4, joint5]
+      target_positions: [0.0, 0.2, -0.1, 0.0, 0.0]
+      max_velocity_rad_s: 0.4
+      verify_bus: true
+  - name: grasp
+    kind: GRIPPER
+    profile: gripper
+    scopes: [gripper]
+    params:
+      gripper:
+        position_rad: 0.35
+        max_velocity_rad_s: 0.5
+        duration_s: 1.0
+        verify_bus: true
