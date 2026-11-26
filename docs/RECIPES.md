@@ -132,8 +132,9 @@ branches:
 - `required: true` with no eligible candidate aborts the run with one stop (the
   linear-engine approximation of `WAITING_FOR_OPERATOR`). `required: false`
   continues the main plan.
-- The tree engine refuses a recipe with `facts`/`branches` until branch support
-  lands; use the default linear engine.
+- Both engines execute declared branches. The tree engine evaluates the
+  selector once per anchor and ticks only the selected branch; a selected
+  branch failure is not swallowed by the fallback.
 - A Derived Plan is a new recipe revision, run id and authorization; it is never
   a mutation of a live plan.
 

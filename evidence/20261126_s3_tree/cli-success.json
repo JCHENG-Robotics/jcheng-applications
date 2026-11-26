@@ -1,0 +1,24 @@
+{
+  "lease_error": null,
+  "lease_released": true,
+  "record": "/tmp/s3-tree-runs/s3-tree-001.jsonl",
+  "record_error": null,
+  "release_error": null,
+  "renewals": 0,
+  "run_id": "s3-tree-001",
+  "state": "SUCCEEDED",
+  "steps": [
+    {
+      "index": 0,
+      "name": "approach-j1",
+      "outcome": "COMPLETED",
+      "reason_code": "OK"
+    },
+    {
+      "index": 1,
+      "name": "adjust-j1",
+      "outcome": "COMPLETED",
+      "reason_code": "OK"
+    }
+  ]
+}

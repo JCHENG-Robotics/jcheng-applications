@@ -13,9 +13,9 @@
 > Supervisor are in `src/jcheng_applications/tree/` as the opt-in
 > `--engine tree`; the default is still linear. The probe and report are in
 > `scripts/m1_5_pytrees_probe.py` and [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md).
-> Declared branches and a three-valued selector are implemented for the
-> **linear engine** with positional arm facts (S3 v0). The tree engine refuses
-> branch recipes; named-joint/gripper facts need a contract change.
+> Declared branches and a three-valued selector are implemented on **both
+> engines** with positional arm facts (S3 v0). Named-joint/gripper facts need a
+> contract change.
 >
 > M2, M3, the M1.5 tree engine and S3 v0 are implemented on the mock. L3
 > evidence: `evidence/20261126_m3_supervised/`,
@@ -382,9 +382,11 @@ Rules:
   `required: false` continues the main plan.
 - Conditions are structured comparisons over an allowlisted fact vocabulary.
   No expression strings, no `eval`, no callable names from data.
-- The tree engine refuses a facts/branches recipe until branch support lands.
-- Verified: `tests/test_branches.py`; L3
-  `evidence/20261126_s3_branches/`; example
+- Both engines execute declared branches. The tree engine evaluates the
+  selector once per anchor and ticks only the selected branch; a selected
+  branch failure propagates (the no-branch fallback is closed).
+- Verified: `tests/test_branches.py`, `tests/test_tree_branches.py`; L3
+  `evidence/20261126_s3_branches/` and `evidence/20261126_s3_tree/`; example
   [`recipes/example-declared-branch.yaml`](../recipes/example-declared-branch.yaml).
 
 ### 8.4 Derived Plan
@@ -637,16 +639,17 @@ There is no application-layer workaround for a gateway defect.
 | Recipe format with `facts` and `branches` validates; v0.1.0 recipes unchanged | **Verified L1**: `tests/test_branches.py` |
 | Branch scopes are part of the recipe union and must be authorized | **Verified L1**: scope-union test |
 | Selector is three-valued, deterministic and cannot read execution outcomes | **Verified L1/L2**: guard table, no-branch-on-failure test |
-| No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | **Partially verified**: linear engine is `ABORTED` + one stop; live `WAITING_FOR_OPERATOR` is not implemented |
+| No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | **Partially verified**: both engines are `ABORTED` + one stop; live `WAITING_FOR_OPERATOR` is not implemented |
 | Derived Plan requires a new version, run id and authorization | **Documented only**: no run registry enforces predecessor identity |
 | Proposal artifact accepts only `params`/`skill`, requires a hash and is recorded | **Not implemented** |
-| Everything above runs against a mock gateway only | **Verified L3**: real system mock gateway + `MockStack`, no robot; tree engine refuses branch recipes |
+| Everything above runs against a mock gateway only | **Verified L3**: real system mock gateway + `MockStack`, no robot; both engines execute the same branch plan with exact report parity |
 
 **S3 v0 (2026-11-26).** Declared branches, positional facts and the
-three-valued selector run on the linear engine. L3 evidence:
-`evidence/20261126_s3_branches/` (fact `index 0=0.03`, guard `PASS`, branch
-selected, 2/2 steps). Named-joint/gripper facts, tree branch execution and a
-live `WAITING_FOR_OPERATOR` remain open.
+three-valued selector run on both engines. L3 evidence:
+`evidence/20261126_s3_branches/` (linear) and `evidence/20261126_s3_tree/`
+(tree); fact `index 0=0.03`, guard `PASS`, branch selected, 2/2 steps. Four
+branch cases produce exact linear/tree report parity. Named-joint/gripper
+facts and a live `WAITING_FOR_OPERATOR` remain open.
 
 ### M4 — supervised hardware acceptance (separate authorization)
 
@@ -829,7 +832,8 @@ result.
 - [`RECIPES.md`](RECIPES.md) — implemented recipe format, including facts/branches.
 - [`INTEGRATION.md`](INTEGRATION.md) — gateway admission, transport and failure semantics.
 - [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md) — py_trees probe, tree engine and T-C06.
-- [`../evidence/20261126_s3_branches/`](../evidence/20261126_s3_branches/README.md) — S3 v0 L3 evidence.
+- [`../evidence/20261126_s3_branches/`](../evidence/20261126_s3_branches/README.md) — S3 v0 linear-engine L3 evidence.
+- [`../evidence/20261126_s3_tree/`](../evidence/20261126_s3_tree/README.md) — S3 tree-engine L3 and branch parity evidence.
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.

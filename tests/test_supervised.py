@@ -136,7 +136,11 @@ def test_renew_failure_marks_lost_blocks_submit_and_stops() -> None:
         assert "503" in (session.error or "")
         with pytest.raises(GatewayUnavailable):
             gateway.submit(_command())
-        assert "/v1/motion/stop" in server.probe.paths()
+        # The renewal thread issues the stop after latching the lease; wait for
+        # the request rather than racing it.
+        assert wait_until(
+            lambda: "/v1/motion/stop" in server.probe.paths(), 1.0
+        )
         assert "/v1/motion/execute" not in server.probe.paths()
         session.release()
 
