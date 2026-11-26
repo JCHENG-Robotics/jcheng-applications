@@ -1,14 +1,16 @@
-"""CLI: validate a recipe, print its plan, or check gateway admission.
+"""CLI: validate, plan, check admission or run one supervised recipe.
 
 ``validate`` and ``plan`` are offline. ``check`` performs the M2 read-only
-admission (GET only) and has no motion authority. There is deliberately no
-``run`` command: pretending to run without the M2/M3 gateway path would invite
-a hardware claim this repository cannot support.
+admission (GET only). ``run`` performs M3 supervised execution against a
+gateway that advertises the ``mock`` capability; it refuses anything else.
+``run`` submits motion and requires an explicit operator ``Authorization``
+record.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,8 +19,17 @@ from typing import Sequence
 
 from . import __version__
 from .gateway import GatewayError
-from .model import RecipeError, build_plan, load_recipe
+from .model import (
+    RecipeError,
+    authorization_from_mapping,
+    build_plan,
+    load_recipe,
+)
+from .runstore import RunStore
+from .runner import RunState
+from .supervised import run_supervised
 from .transport import GatewayEndpoint, ReadOnlyGateway
+from .write_transport import HttpGateway
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -56,6 +67,34 @@ def _parser() -> argparse.ArgumentParser:
         help="http(s)://host[:port]; defaults to JCHENG_GATEWAY_URL",
     )
     check.add_argument("--timeout", type=float, default=2.0)
+
+    run = subparsers.add_parser(
+        "run",
+        help="supervised execution against a mock gateway; submits motion",
+    )
+    run.add_argument("recipe", type=Path)
+    run.add_argument(
+        "--authorization",
+        type=Path,
+        required=True,
+        help="JSON Authorization record supplied by the operator",
+    )
+    run.add_argument("--run-id", required=True)
+    run.add_argument(
+        "--url",
+        default=os.environ.get("JCHENG_GATEWAY_URL", ""),
+        help="http(s)://host[:port]; defaults to JCHENG_GATEWAY_URL",
+    )
+    run.add_argument("--timeout", type=float, default=2.0)
+    run.add_argument("--ttl-ms", type=int, default=30_000)
+    run.add_argument(
+        "--store-dir",
+        default="~/.local/state/jcheng-applications/runs",
+        help="append-only run records; must be outside the repository",
+    )
+    run.add_argument(
+        "--evidence-class", choices=["L2", "L3"], default="L2"
+    )
     return parser
 
 
@@ -83,11 +122,80 @@ def _check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run(args: argparse.Namespace) -> int:
+    token = os.environ.get("JCHENG_GATEWAY_TOKEN", "")
+    if not args.url or not token:
+        print(
+            "error: --url/JCHENG_GATEWAY_URL and JCHENG_GATEWAY_TOKEN are required",
+            file=sys.stderr,
+        )
+        return 2
+    store_dir = Path(args.store_dir).expanduser().resolve()
+    repo_root = Path(__file__).resolve().parents[2]
+    if store_dir == repo_root or repo_root in store_dir.parents:
+        print("error: --store-dir must be outside the repository", file=sys.stderr)
+        return 2
+
+    recipe = load_recipe(args.recipe)
+    authorization = authorization_from_mapping(
+        json.loads(args.authorization.read_text(encoding="utf-8"))
+    )
+    endpoint = GatewayEndpoint(
+        base_url=args.url, token=token, timeout_s=args.timeout
+    )
+    gateway = HttpGateway(endpoint, operator_id=authorization.operator)
+    result = run_supervised(
+        gateway,
+        recipe,
+        authorization,
+        run_id=args.run_id,
+        store=RunStore(store_dir),
+        recipe_hash=hashlib.sha256(args.recipe.read_bytes()).hexdigest(),
+        ttl_ms=args.ttl_ms,
+        evidence_class=args.evidence_class,
+    )
+    print(
+        json.dumps(
+            {
+                "run_id": result.report.run_id,
+                "state": result.report.state.value,
+                "steps": [
+                    {
+                        "index": step.index,
+                        "name": step.name,
+                        "outcome": step.outcome,
+                        "reason_code": step.reason_code,
+                    }
+                    for step in result.report.steps
+                ],
+                "record": str(result.record_path) if result.record_path else None,
+                "record_error": result.record_error,
+                "lease_released": result.lease_released,
+                "renewals": result.renewals,
+                "lease_error": result.lease_error,
+                "release_error": result.release_error,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    if result.record_error is not None:
+        # The motion may have happened; the evidence is missing. Never exit 0.
+        print(
+            f"error: run record was not written: {result.record_error}",
+            file=sys.stderr,
+        )
+        return 2
+    return 0 if result.report.state is RunState.SUCCEEDED else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command == "check":
             return _check(args)
+        if args.command == "run":
+            return _run(args)
         recipe = load_recipe(args.recipe)
         if args.command == "validate":
             print(

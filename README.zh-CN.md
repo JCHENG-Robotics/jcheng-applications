@@ -3,10 +3,9 @@
 **简体中文** | [English](README.md)
 
 > 状态：**实验性**，2026-11-26。版本 0.1.0。
-> 准入骨架加离线任务编排核心：配方校验、确定性规划，以及面向抽象网关端口的
-> 失败关闭运行器。M2 增加了一个只读传输（仅 GET、有界超时、不重试），
-> 不提交意图、没有运行进程。M3 因系统侧 C2 探针失败而暂停。
-> 运行中的机器人不会使用其中任何内容。
+> 准入骨架加任务编排核心：配方校验、确定性规划、面向抽象网关端口的失败关闭
+> 运行器、M2 只读传输，以及 M3 面向 mock 网关的受监督 `run`。共享执行核心
+> 已抽取；M1.5 树运行时仍只是探针。不使用硬件，也不在机器人上运行。
 > 本文为英文主文档的中文对照；如有歧义，以英文版为准。
 
 `jcheng-applications` 是 JCHENG 生态的 L4 任务编排应用。它把操作员编写的配方
@@ -22,7 +21,7 @@
 | 层 | L4 任务编排（见[仓库分类](https://github.com/JCHENG-Robotics/.github/blob/main/docs/repo-taxonomy.md)） |
 | 运行位置 | 操作员笔记本或工作站；绝不在机器人上运行 |
 | 输入 | 配方 YAML、显式的每会话 `Authorization` 记录，以及网关的 `ContractInfo` / `SafetySnapshot` / `MotionResult`（M2/M3） |
-| 输出 | 带稳定幂等键的确定性 `Plan`，以及内存中的 `RunReport`；M3 起产生网关意图请求；M3 起持久化运行记录 |
+| 输出 | 带稳定幂等键的确定性 `Plan`；`RunReport`；网关意图请求；仓库外的哈希链运行记录（M3） |
 | 运动授权 | 无。控制租约、deadman、限幅、停止锁存与运动执行都属于系统层 |
 | 硬件访问 | `none` |
 | 拥有的设备 | 无 |
@@ -30,6 +29,8 @@
 
 权威划分是结构性的，不是编码约定：
 
+- M3 在首次提交前通过网关获取**客户端租约引用**，并在所有终态路径释放。系统层
+  拥有租约、可随时撤销，并且仍是运动的唯一来源。
 - 配方是对意图序列的请求，不是可直接访问设备的程序。
 - 运行器每步最多提交一个意图，绝不重试。超时、结果未知，或完成但缺少总线实测，
   都会停止本次运行。
@@ -42,7 +43,7 @@
 
 ```text
 jcheng-applications/
-├── capability.yaml                 # 准入清单（offline，hardware_access: none）
+├── capability.yaml                 # 准入清单（motion_source，hardware_access: none）
 ├── docs/
 │   ├── ARCHITECTURE.md             # 平面、组件与运行状态机
 │   ├── INTEGRATION.md              # 网关契约、准入与失败语义
@@ -55,14 +56,19 @@ jcheng-applications/
 │   ├── model.py                    # 配方模型、契约常量与规划器
 │   ├── gateway.py                  # GatewayPort 协议与契约解析
 │   ├── transport.py                # M2 只读 GET 传输（不提交意图）
+│   ├── write_transport.py          # M3 lease/execute/stop 传输（仅 mock）
+│   ├── lease.py                    # 租约获取、续约与释放
+│   ├── runstore.py                 # 仓库外的哈希链运行记录
+│   ├── supervised.py               # 租约 + 运行器 + 持久化报告
 │   ├── core/                       # 共享预检、命令、分类、提交与 stop-once
 │   ├── runner.py                   # 基于共享核心的失败关闭运行器
-│   └── cli.py                      # validate/plan 与只读 check 命令行
-├── tests/                          # 契约、配方、网关、运行器与 CLI 测试
+│   └── cli.py                      # validate/plan/check/run 命令行
+├── tests/                          # 契约、配方、传输、租约与受监督运行测试
 ├── scripts/check_repo_gate.sh      # 仓库门禁（本地与 CI）
 ├── scripts/m1_5_pytrees_probe.py   # 候选运行时隔离探针（不是运行时依赖）
 ├── evidence/20261126_scaffold/     # M0/M1 证据记录
 ├── evidence/20261126_m1_5_pytrees/ # M1.5 隔离探针证据
+├── evidence/20261126_m3_supervised/# M3 L3 受监督运行证据
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -76,10 +82,11 @@ jcheng-applications/
   不导入它，它目前也不是依赖。
 - 不需要 ROS，任何阶段都不需要：本仓库不加入 DDS 图，也不使用 RMW。网关是
   HTTP/WS 边界。
-- M2 传输使用标准库 `http.client`，不引入第三方 HTTP 依赖；仅 GET，且有界超时。
+- 两个传输都使用标准库 `http.client`，不引入第三方 HTTP 依赖。M2 仅 GET；
+  M3 只向声明 `mock` 能力的网关提交。
 - 门禁不发起网络请求。传输测试绑定临时回环端口，不需要机器人、网关或网络监听。
-- 任何执行（M3）都需要 `jcheng-system` 网关和经操作员授权的会话；M3 已暂停，
-  M2 的 `check` 只读。
+- `run` 需要 `jcheng-system` 网关、操作员提供的 `Authorization` JSON 和环境变量
+  中的网关令牌。它拒绝非 mock 网关，并把记录写在仓库外。
 
 ## 快速开始
 
@@ -100,14 +107,24 @@ export JCHENG_GATEWAY_URL=http://127.0.0.1:8766
 export JCHENG_GATEWAY_TOKEN=...   # 由操作员设置；不得提交
 jcheng-applications check --url "$JCHENG_GATEWAY_URL"
 
+# M3 受监督运行：仅 mock 网关。配方必须使用单关节 JOINT_STEP；
+# 系统 profile 每步只接受一个关节。
+jcheng-applications run path/to/m3-recipe.yaml \
+  --authorization /path/to/authorization.json \
+  --run-id demo-002 \
+  --url http://127.0.0.1:18766 \
+  --store-dir ~/.local/state/jcheng-applications/runs \
+  --evidence-class L3
+
 # 与 CI 等价。
 python3 -m pytest -q
 bash scripts/check_repo_gate.sh
 ```
 
-**刻意没有 `run` 命令**。`check` 只读健康、契约、状态与安全，不做其他事情。
-在 M2/M3 网关路径和 C2 结论之前提供看似可运行的命令，会诱发本仓库无法支撑的
-硬件声明。运行器只在测试中针对进程内假网关进行验证。
+`run` 是唯一会提交运动的命令，且仅限 mock：健康接口未声明 `mock` 的网关一律
+拒绝；它要求显式 `Authorization` 记录，获取并释放客户端租约，并把哈希链记录写
+在仓库外。`check` 只读健康、契约、状态与安全。任何命令都不打开设备、不加入
+DDS，也不自行执行运动。
 
 ## 验证状态
 
@@ -118,11 +135,12 @@ bash scripts/check_repo_gate.sh
 | 计划确定，幂等键与运行绑定 | 已验证（L1，2026-11-26） | `tests/test_recipe.py`；`src/jcheng_applications/model.py` |
 | 运行器在提交任何内容前拒绝缺失授权、作用域不足、契约不匹配、非 `ARMED_IDLE` 安全状态与缺失租约 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
 | 被拒绝、中止、超时或未实测的步骤会停止运行，且绝不重试 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
-| 仓库中不存在硬件、DDS 或运动执行路径；网络访问只允许 GET-only 的 `transport.py` | 已验证（L0，2026-11-26） | `tests/test_no_hardware.py` |
+| 仓库中不存在硬件、DDS 或运动执行路径；网络访问只允许 `transport.py` 与 `write_transport.py`，且写路径拒绝非 mock 网关 | 已验证（L0，2026-11-26） | `tests/test_no_hardware.py`；`tests/test_supervised.py` |
 | 只读网关准入：四项 GET、有界超时、不重试、拒绝契约/鉴权/格式错误 | 已验证（L2，2026-11-26） | `tests/test_transport.py`；`evidence/20261126_m2_transport/`；[CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | Shared Execution Core；线性与树驱动共用同一分类器 | 部分验证（L2，2026-11-26） | `tests/test_core.py`；M1.5 M15-K 11 例差分；`evidence/20261126_shared_core/`；完整 `RunReport` 对齐待补 |
-| 向真实网关提交意图 | 未验证；M3 暂停 | `jcheng-system` C2 失败 |
-| 持久化运行记录与操作员会话关联 | 未验证 | 尚未实现（M2） |
+| 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
+| 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
+| 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |
 | 任何硬件行为 | 未验证 | 无 L5 会话；无运行时 |
 
 完整报告：[ACCEPTANCE.md](ACCEPTANCE.md)。

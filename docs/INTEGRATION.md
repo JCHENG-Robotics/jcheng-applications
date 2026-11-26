@@ -1,14 +1,14 @@
 # Integration — jcheng-applications
 
-> Status: **Experimental** as of 2026-11-26. The M2 read-only transport is
-> implemented locally: four GET reads, bounded timeouts, no retry. No intent
-> submission, stop or lease mutation exists. M3 is unblocked on the mock after
-> the system-side C2 revision and is not implemented.
+> Status: **Experimental** as of 2026-11-26. The M2 read-only transport and the
+> M3 supervised write path are implemented. M3 acquires and releases a client
+> lease and submits only to a gateway that advertises `mock`; the deployed
+> gateway and hardware remain M4.
 
 ## 1. Admission and discovery
 
-The system reads `capability.yaml` and checks the admission fields. For v0.1.0
-it finds:
+The system reads `capability.yaml` and checks the admission fields. For the M3
+manifest it finds:
 
 | Field | Value | Meaning |
 |---|---|---|
@@ -16,20 +16,20 @@ it finds:
 | `version` | `0.1.0` | must match `VERSION` |
 | `contract.interfaces` | `>=0.1,<0.2` | pinned contract range |
 | `contract.contract_hash` | `sha256:0b8d72…24b42` | must match the interfaces manifest |
-| `safety.class` | `offline` | no intent is produced in v0.1.0 |
-| `safety.scopes` | `[]` | no motion scope is claimed |
-| `safety.requires_lease` | `true` | required by the schema; becomes binding at M3, when a gateway session holds the lease reference |
+| `safety.class` | `motion_source` | a gateway intent source, not a DDS publisher |
+| `safety.scopes` | `arm`, `gripper` | exactly the recipe scopes shipped here |
+| `safety.requires_lease` | `true` | binding: the run acquires a lease before the first submission and releases it on every terminal path |
 | `hardware_access` | `none` | hard boundary |
 | `runtime` | empty | no ROS domain, no topics, no services |
 
 Because the runtime surface is empty, admission means "no runtime object to
 discover". The application is not a ROS node and never appears in a DDS graph;
-the system layer does not need to arbitrate with it. M2 adds an HTTP/WS
-transport; the runtime surface stays empty because HTTP is not a ROS interface.
+the system layer does not need to arbitrate with it. M2/M3 use HTTP; the
+runtime surface stays empty because HTTP is not a ROS interface.
 
-The class and scopes change at M3 through a contract-first review: the gateway
-adapter will submit intent, so the manifest will need a non-offline class and
-the scopes its recipes actually use. v0.1.0 does not pre-claim them.
+M3 moved the class to `motion_source` and the scopes to `arm`/`gripper` through
+the contract-first review. The runtime surface stays empty because HTTP is not
+a ROS interface; the application remains a gateway client, not a DDS node.
 
 ## 2. Gateway transport and contract
 
@@ -38,15 +38,15 @@ is no second path: no SSH, no vendor SDK, no ROS topic, no serial device.
 
 | Item | Rule |
 |---|---|
-| Base URL | Operator configuration at M2; no address is hard-coded or committed |
+| Base URL | Operator configuration; no address is hard-coded or committed |
 | Authentication | `Authorization: Bearer <token>` per the gateway OpenAPI; the token is read from operator configuration and never enters git |
 | Health | `GET /v1/health` is unauthenticated liveness; it carries no motion authority |
 | Contract | `GET /v1/contract` returns `ContractInfo`; a hash or range mismatch refuses the run |
 | Safety | `GET /v1/safety` returns `SafetyState`; a run requires `ARMED_IDLE` and no stop latch |
 | State | `GET /v1/state` returns `truth` (`measured` or `commanded`), `verification`, `fresh`, `profile_hash` and `header.stamp`. A `commanded` snapshot is never treated as measurement |
-| Lease | The client session's lease reference is reported by the gateway; the system layer owns the lease and may revoke it |
+| Lease | `POST /v1/leases` acquires a client reference, `POST /v1/leases/{id}/renew` renews at `ttl/3`, `DELETE /v1/leases/{id}` releases. The system layer owns the lease and may revoke it |
 | Intent validation | `POST /v1/motion/validate` for a dry validation when M2 needs it |
-| Intent submission | `POST /v1/motion/execute` with the `Idempotency-Key` header; the gateway and system layer perform the motion |
+| Intent submission | `POST /v1/motion/execute` with the `Idempotency-Key` header; the gateway and system layer perform the motion. M3 refuses a gateway without the `mock` capability |
 | Stop | `POST /v1/motion/stop` after a failed or indeterminate submission |
 | Events | `GET /v1/events` and the WebSocket envelope for state, safety, lease and motion events |
 | Ports | Deployment detail, not contract; the adapter reads the configured URL and assumes nothing |
@@ -76,9 +76,9 @@ endpoint.
 
 ## 4. Authorization and sessions
 
-The application performs no motion on its own and never holds the system's
-control lease. It forwards intents to the gateway, where the system layer
-applies the lease, deadman, limits and stop latch.
+The application performs no motion on its own. From M3 it acquires a **client
+lease reference** through the gateway; the system owns the lease, may revoke or
+pre-empt it at any moment, and applies the deadman, limits and stop latch.
 
 - Every real-robot motion requires separate, explicit, per-session operator
   authorization. A previous session's approval does not carry over.
@@ -97,6 +97,9 @@ applies the lease, deadman, limits and stop latch.
 
 | Condition | Required behavior |
 |---|---|
+| Gateway does not advertise `mock` | Refused before a lease or submission; `run` exits non-zero |
+| Lease acquisition fails | `run` exits non-zero; nothing submitted |
+| Lease renewal fails during the run | One stop; later submissions are blocked; the run cannot succeed |
 | Gateway unreachable at preflight | `ABORTED`; nothing submitted; no retry loop |
 | `GET /v1/contract` hash or range mismatch | `ABORTED`; no fallback gateway |
 | Safety not `ARMED_IDLE`, stop latched or unknown | `ABORTED`; nothing submitted |
@@ -110,6 +113,7 @@ applies the lease, deadman, limits and stop latch.
 | `MotionResult.outcome = TIMEOUT` or `UNKNOWN` | `INDETERMINATE`; one stop request |
 | `COMPLETED` without `bus_verified` for arm/gripper/full | `INDETERMINATE`; one stop request |
 | Stop path fails | run state preserved; `stop_error` recorded; operator notified |
+| Run record cannot be written | The report is still returned; `record_error` is set and `run` exits 2; the motion may have happened |
 
 The application has no authority to reset the system layer. A wedged gateway or
 a latched stop is the system layer's incident, handled by `jcheng-ops` and the
@@ -134,7 +138,7 @@ operator runbook.
 |---|---|
 | v0.1.0 admission and offline core | `python3 -m pytest -q`; `bash scripts/check_repo_gate.sh` |
 | M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI `applications-gate` passed |
-| M3 supervised execution | Paused by the system-side C2 probe; no submission path exists |
+| M3 supervised execution | Real `jcheng-system` gateway process + `MockStack` on loopback (L3, 2026-11-26): lease acquire/release, 3/3 steps, stop-on-rejection, hash-chained record. No robot. Evidence: `evidence/20261126_m3_supervised/` |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 
 No hardware claim is valid before M4. Synthetic, mock and replay results are

@@ -2,18 +2,17 @@
 # jcheng-applications is an L4 task-orchestration application
 # (JCHENG-Robotics/.github docs/repo-taxonomy.md, layer L4).
 #
-# v0.1.0 is admission plus an offline orchestration core: recipe validation,
-# deterministic planning and a fail-closed runner over an abstract GatewayPort.
-# It ships no HTTP/WS client, starts no process, joins no DDS domain, opens no
-# device and submits no intent. The empty runtime surface is deliberate: a
-# planned application must not claim a transport it does not serve.
+# M3 is a supervised execution client: it acquires a system lease and submits
+# MotionCommands to the jcheng-system gateway over HTTP. It is a gateway intent
+# source, not a DDS publisher: the runtime surface stays empty, it joins no ROS
+# domain, opens no device and never executes motion itself. The system layer
+# remains the only origin of motion and owns the lease, deadman, limits and
+# stop latch.
 #
-# The permanent division of authority is fixed: the application asks the system
-# gateway to evaluate an intent and never executes motion itself. The system
-# layer owns the lease, deadman, limits, stop latch and motion entry point. M2
-# adds the HTTP/WS transport; this file still gains no ROS runtime surface. M3
-# changes the safety class and scopes through a contract-first review, when an
-# authorized session actually submits intent.
+# The class moves from offline to motion_source because an authorized session
+# can now cause a motion intent through the gateway. The scopes are exactly the
+# recipe scopes the repository ships; a recipe with another scope is refused by
+# the preflight before submission.
 schema_version: 1
 name: jcheng-applications
 version: 0.1.0
@@ -22,10 +21,10 @@ contract:
   contract_hash: "sha256:0b8d72ced7f54d444d6851d8b99a51a78e2bed3f687324f51a15f76557f24b42"
   system_api: ">=0.1,<0.2"
 safety:
-  class: offline
-  scopes: []
-  # Required by capability-manifest.v1.schema.json. It is vacuous in v0.1.0
-  # because no intent is produced; it becomes binding at M3.
+  class: motion_source
+  scopes: [arm, gripper]
+  # Binding at M3: the run acquires a lease before the first submission and
+  # releases it on every terminal path.
   requires_lease: true
   max_rate_hz: 1
   deadman_ms: 500

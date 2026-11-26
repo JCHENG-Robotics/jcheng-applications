@@ -213,6 +213,46 @@ def _name(value: Any, where: str) -> str:
     return text
 
 
+_AUTHORIZATION_FIELDS = frozenset(
+    {"operator", "session_id", "scopes", "approved", "approved_at"}
+)
+
+
+def authorization_from_mapping(value: Any) -> Authorization:
+    """Parse an operator-supplied ``Authorization`` record.
+
+    The record is data, like a recipe: unknown fields are rejected and the
+    scopes must be known. Whether the record is approved and covers the recipe
+    is decided later by the preflight, not by the parser.
+    """
+
+    root = _mapping(value, "authorization")
+    _exact_keys(root, _AUTHORIZATION_FIELDS, "authorization")
+    operator = _text(root["operator"], "authorization.operator")
+    session_id = _text(root["session_id"], "authorization.session_id")
+    raw_scopes = root["scopes"]
+    if not isinstance(raw_scopes, list) or not raw_scopes:
+        _fail("authorization.scopes", "must be a non-empty list")
+    scopes: list[str] = []
+    for index, scope in enumerate(raw_scopes):
+        if not isinstance(scope, str) or scope not in SCOPES:
+            _fail(f"authorization.scopes[{index}]", f"unknown scope {scope!r}")
+        if scope in scopes:
+            _fail("authorization.scopes", f"duplicate scope {scope!r}")
+        scopes.append(scope)
+    approved = root["approved"]
+    if not isinstance(approved, bool):
+        _fail("authorization.approved", "must be a boolean")
+    approved_at = _text(root["approved_at"], "authorization.approved_at")
+    return Authorization(
+        operator=operator,
+        session_id=session_id,
+        scopes=frozenset(scopes),
+        approved=approved,
+        approved_at=approved_at,
+    )
+
+
 def _finite_number(value: Any, where: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         _fail(where, "must be a number")

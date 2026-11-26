@@ -8,6 +8,28 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- M3 supervised execution on the mock gateway: `write_transport.py` implements
+  lease acquire/renew/release, one execute per step and one stop; it refuses a
+  gateway whose health does not advertise `mock`. `lease.py` renews at
+  `ttl/3`, releases on every terminal path, and blocks submissions after a
+  renewal failure. `runstore.py` writes append-only, hash-chained JSONL records
+  (mode 0600) outside the repository. `supervised.py` composes lease, runner
+  and record.
+- `jcheng-applications run`: the first command that submits motion. It requires
+  an operator `Authorization` JSON, a `JCHENG_GATEWAY_TOKEN`, a mock gateway
+  and a store outside the repository; it exits 2 if the record cannot be
+  written even when the run finished.
+- `authorization_from_mapping`: strict parser for the operator record (unknown
+  fields, non-boolean approval, unknown or duplicate scopes are rejected).
+- `capability.yaml` moves to `safety.class: motion_source` with scopes
+  `arm`/`gripper`, `requires_lease: true`; the runtime surface stays empty
+  because this is an HTTP gateway client, not a DDS node.
+- `tests/test_write_transport.py`, `tests/test_supervised.py`: loopback
+  coverage of lease lifecycle, renewal failure, mock-only refusal, stop on
+  rejection, record chaining/tampering and record-write failure.
+- `evidence/20261126_m3_supervised/`: L3 evidence against the real
+  `jcheng-system` gateway process with `MockStack` (3/3 steps, lease released,
+  record verified; no robot).
 - `docs/TASK_ENGINE.md`: design for a tree-based task engine, a shared
   Execution Core, an independent Run Supervisor, declared recovery branches,
   three-valued guards and a deterministic selector. Design only: no runtime,
@@ -38,6 +60,14 @@ All notable changes to this project are documented here. Format based on
 
 ### Changed
 
+- `RECIPES.md` records the deployment constraint found in L3: the system
+  profile accepts exactly one joint per `JOINT_STEP`; a multi-joint step is
+  syntactically valid but rejected by the gateway. The shipped offline example
+  remains multi-joint and is not a hardware program. The documentation no
+  longer lists `max_acceleration_rad_s2` for `JOINT_STEP`; the validator never
+  accepted it.
+- M3 is complete on the mock; the deployed gateway and R5 remain M4
+  prerequisites. The application never works around a gateway stop race.
 - Extracted the Shared Execution Core into `src/jcheng_applications/core/`:
   preflight, command construction, terminal classification, one submission per
   step and stop-once. `runner.py` delegates to it with an unchanged public API

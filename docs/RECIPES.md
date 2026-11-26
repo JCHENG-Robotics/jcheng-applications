@@ -50,15 +50,22 @@ are session and deployment inputs.
 | Kind | Required payload | Notes |
 |---|---|---|
 | `JOINT_TRAJECTORY` | `trajectory` | `joint_names` plus non-empty `points`; each point has `positions`, `velocities`, `accelerations` and `time_from_start`, with one value per joint |
-| `JOINT_STEP` | `joint_names`, `target_positions` | equal lengths; optional `max_velocity_rad_s`, `max_acceleration_rad_s2`, `duration_s` |
+| `JOINT_STEP` | `joint_names`, `target_positions` | equal lengths; optional `max_velocity_rad_s`, `duration_s`. The deployed system profile accepts **one joint per step** (see the note below) |
 | `POSE` | `target_pose`, `tip_link`, `frame_id` | `target_pose` has `position {x,y,z}` and `orientation {x,y,z,w}` |
 | `HOME` | none | optional common parameters only |
 | `BASE_PULSE` | `base_pulse` | `{duty, duration_s, require_stopped_after}`; 1 to 4 duty values in `[-1, 1]` |
 | `GRIPPER` | `gripper` | `{position_rad, max_velocity_rad_s, duration_s, verify_bus}`; `position_rad` in `[0, 2.22]` |
 
-Common optional parameters: `max_velocity_rad_s`, `max_acceleration_rad_s2`,
+Common optional parameters: `max_velocity_rad_s`, `max_acceleration_rad_s`,
 `duration_s`, `verify_bus`, `require_measured_state`, `expected_profile_hash`.
 All numbers must be finite; `NaN` and infinity are rejected.
+
+**Deployment note (M3).** The deployed `jcheng-system` profile accepts exactly
+one joint per `JOINT_STEP`; a multi-joint command is rejected at the gateway
+with `INVALID_COMMAND`. The validator permits a list for offline planning, so
+a multi-joint step is syntactically valid but not executable against the
+current profile. Split multi-joint moves into one step per joint. The shipped
+offline example is multi-joint and is not a hardware program.
 
 A step's scope must match the command it carries: `JOINT_TRAJECTORY`,
 `JOINT_STEP`, `POSE` and `HOME` use `arm`; `BASE_PULSE` uses `base`; `GRIPPER`

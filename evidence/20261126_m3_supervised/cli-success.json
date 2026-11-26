@@ -1,0 +1,30 @@
+{
+  "lease_error": null,
+  "lease_released": true,
+  "record": "/tmp/m3-runs/m3-e2e-004.jsonl",
+  "record_error": null,
+  "release_error": null,
+  "renewals": 0,
+  "run_id": "m3-e2e-004",
+  "state": "SUCCEEDED",
+  "steps": [
+    {
+      "index": 0,
+      "name": "approach-j1",
+      "outcome": "COMPLETED",
+      "reason_code": "OK"
+    },
+    {
+      "index": 1,
+      "name": "approach-j2",
+      "outcome": "COMPLETED",
+      "reason_code": "OK"
+    },
+    {
+      "index": 2,
+      "name": "grasp",
+      "outcome": "COMPLETED",
+      "reason_code": "OK"
+    }
+  ]
+}
