@@ -12,6 +12,8 @@ dependencies = ["PyYAML>=6.0,<7"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.4,<9"]
+# Optional M1.5 tree engine. Not the default; the license review is open.
+tree = ["py_trees==2.6.0", "pydot==4.0.1", "pyparsing==3.3.3"]
 
 [project.scripts]
 jcheng-applications = "jcheng_applications.cli:main"

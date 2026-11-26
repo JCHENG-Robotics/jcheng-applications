@@ -11,7 +11,7 @@
 |---|---|
 | `LICENSE` file | none |
 | Code in v0.1.0 | Python orchestration core, tests, a shell gate and documentation |
-| Runtime dependencies | `PyYAML` (MIT) |
+| Runtime dependencies | `PyYAML` (MIT); optional `tree` extra: `py_trees==2.6.0` (BSD-3), `pydot==4.0.1`, `pyparsing==3.3.3` (MIT) |
 | Test dependencies | `pytest` (MIT) |
 | Robot or vendor code | none copied |
 | Model weights or datasets | none |
@@ -39,10 +39,10 @@ The review must decide before the ecosystem reaches v1.0:
 | Python standard library | code | PSF | Low |
 | PyYAML | recipe parsing | MIT | Low |
 | pytest | tests only | MIT | Low |
-| `py_trees` 2.6.0 (M1.5 candidate) | tree runtime for the task engine, not a v0.1.0 or runtime dependency | BSD-3-Clause | Low; tested in an isolated venv, wheel `78155ffa…89837` |
-| `pydot` (transitive of py_trees) | graph rendering only; not used by the tick path | MIT | Low; pin before adoption. 4.0.1 resolved in the probe |
+| `py_trees` 2.6.0 | optional `tree` extra for the M1.5 engine; not the default engine | BSD-3-Clause | Low; tested in an isolated venv and in CI, wheel `78155ffa…89837` |
+| `pydot` (transitive of py_trees) | graph rendering only; not used by the tick path | MIT | Low; pinned 4.0.1 in the `tree` extra |
 | `pyparsing` (transitive of pydot) | parser used by pydot | MIT | Low |
-| HTTP/WS client (TBD at M2) | gateway transport | TBD | Decide before adoption |
+| HTTP/WS client | M2/M3 gateway transport | Python standard library `http.client` (PSF) | None; no third-party client |
 | Recipe files | operator-authored intent sequences | Organization decision | Decide before accepting third-party recipes |
 
 ## 4. Open questions
@@ -50,12 +50,13 @@ The review must decide before the ecosystem reaches v1.0:
 - [ ] Confirm the copyright holder and year.
 - [ ] Confirm the intended license for application repositories.
 - [ ] Decide whether recipe files are code or data.
-- [ ] Decide whether `py_trees` 2.6.0 (BSD-3) is approved as the M1.5 tree
-      runtime and whether a notice is required. It declares `pydot>=1.4`;
-      pydot and pyparsing must be locked with it.
+- [ ] Decide whether `py_trees` 2.6.0 (BSD-3) is approved as the optional
+      `tree` extra and whether a notice is required. It declares `pydot>=1.4`;
+      pydot 4.0.1 and pyparsing 3.3.3 are pinned with it.
+- [ ] Decide whether the tree engine may become the default engine after the
+      review; it is opt-in today.
 - [ ] Confirm that pydot 4.x is acceptable for py_trees 2.6 rendering; the
       tick path does not use it and rendering compatibility is untested.
-- [ ] Decide the notice requirement for the M2 HTTP/WS client.
 - [ ] Record the ecosystem-wide decision in `.github/docs/license-review.md`.
 
 ## 5. Related

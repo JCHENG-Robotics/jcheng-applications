@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from .core.preflight import PreflightRefusal
+from .gateway import GatewayProtocolError
 from .lease import LeaseSession
 from .model import Authorization, Recipe, build_plan
 from .runstore import RunStore, plan_digest
-from .runner import RunReport, TaskRunner
+from .runner import RunReport, TaskRunner, aborted_report
+from .tree import TreeEngineUnavailable
 from .write_transport import LeaseInfo
 
 
@@ -44,16 +48,39 @@ def run_supervised(
     ttl_ms: int = 30_000,
     evidence_class: str = "L2",
     require_mock: bool = True,
+    engine: str = "linear",
+    deadline_s: float | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> SupervisedResult:
     """Acquire a lease, run the recipe, release the lease and persist the report.
 
-    The lease is acquired before the runner's preflight so the preflight sees a
-    real lease reference. Any refusal still releases the lease. The report is
-    written even when the run is refused or indeterminate.
+    ``engine="linear"`` is the default. ``engine="tree"`` requires the optional
+    ``tree`` extra (py_trees) and is the M1.5 production tree runtime. The
+    lease is acquired before preflight so the preflight sees a real lease
+    reference; any refusal still releases it. The report is written even when
+    the run is refused or indeterminate.
     """
 
     if evidence_class not in {"L2", "L3"}:
         raise ValueError("evidence_class must be L2 or L3")
+    if engine not in {"linear", "tree"}:
+        raise ValueError("engine must be 'linear' or 'tree'")
+    if deadline_s is not None and engine != "tree":
+        raise ValueError("deadline_s requires the tree engine")
+    if deadline_s is not None and deadline_s <= 0:
+        raise ValueError("deadline_s must be positive")
+
+    tree_run = None
+    if engine == "tree":
+        try:
+            from .tree.runtime import run_tree
+        except ModuleNotFoundError as exc:
+            raise TreeEngineUnavailable(
+                "the tree engine requires the optional 'tree' extra "
+                "(pip install -e '.[tree]')"
+            ) from exc
+        tree_run = run_tree
+
     if require_mock:
         gateway.check_mock()
 
@@ -66,7 +93,36 @@ def run_supervised(
     )
     info = session.acquire()
     try:
-        report = TaskRunner(gateway).run(recipe, authorization, run_id=run_id)
+        if tree_run is None:
+            runner = (
+                TaskRunner(gateway)
+                if clock is None
+                else TaskRunner(gateway, clock=clock)
+            )
+            report = runner.run(recipe, authorization, run_id=run_id)
+        else:
+            tree_kwargs: dict[str, Any] = {"deadline_s": deadline_s}
+            if clock is not None:
+                tree_kwargs["clock"] = clock
+            try:
+                report = tree_run(
+                    gateway,
+                    recipe,
+                    authorization,
+                    plan=plan,
+                    run_id=run_id,
+                    lease_id=info.lease_id,
+                    **tree_kwargs,
+                )
+            except (PreflightRefusal, GatewayProtocolError) as exc:
+                reason = f"{type(exc).__name__}: {exc}"
+                report = (
+                    aborted_report(recipe, authorization, run_id, reason)
+                    if clock is None
+                    else aborted_report(
+                        recipe, authorization, run_id, reason, clock=clock
+                    )
+                )
     finally:
         released = session.release()
 

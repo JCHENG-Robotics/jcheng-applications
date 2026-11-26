@@ -6,9 +6,10 @@
 > device path. `run` refuses a gateway that does not advertise `mock`; the
 > deployed gateway and hardware remain M4.
 >
-> The Shared Execution Core is extracted. The planned production tree executor,
-> Run Supervisor and strategy selection are specified in
-> [`TASK_ENGINE.md`](TASK_ENGINE.md); they are design/probe only.
+> The Shared Execution Core is extracted. An opt-in py_trees engine and an
+> independent Run Supervisor are implemented (`--engine tree`); the default is
+> still the linear engine, and py_trees is an optional extra pending licence
+> review. Strategy selection and declared branches remain design-only.
 
 ## 1. Position in the ecosystem
 
@@ -58,7 +59,9 @@ Rules that come from the ecosystem and are not negotiable here:
 | Recipe model | Operator laptop, in process | Parse and validate YAML against the pinned contract; reject unknown fields, kinds, scopes and payloads | Accepting an unversioned or unpinned contract |
 | Planner | Operator laptop, in process | Produce a stable `Plan` with one idempotency key per step | I/O, network, time-dependent keys, hidden randomness |
 | Shared execution core | Operator laptop, in process | Preflight, command construction, one submission per step, terminal classification and stop-once, used by every driver | Retrying an indeterminate motion, inventing a result, widening authorization |
-| Runner | Operator laptop, in process | Authorize, preflight, submit one intent per step, map the terminal result, request one stop on failure | Retrying an indeterminate motion, inventing a result, widening authorization |
+| Linear runner | Operator laptop, in process | Preflight, submit one intent per step, map the terminal result, request one stop on failure | Retrying an indeterminate motion, inventing a result, widening authorization |
+| Tree engine (M1.5, opt-in) | Operator laptop, in process | py_trees `Sequence` over the shared core; one daemon worker; one in-flight step | Direct gateway calls, retry, a second in-flight step |
+| Run Supervisor (M1.5) | Operator laptop, own thread | Run deadline, cancellation and the one stop, independent of the tree loop | Driving the tree, renewing or owning the lease |
 | Gateway port | Operator laptop, abstract | The only path to the robot; M2 reads and M3 writes go through it | Device, ROS, SSH or vendor-SDK access |
 | Read-only transport (M2) | Operator laptop, in process | `GET /v1/health`, `/contract`, `/state` and `/safety` with bounded timeouts and strict parsing | POST, submission, stop, lease mutation, retry |
 | Write transport (M3) | Operator laptop, in process | Lease acquire/renew/release, one execute per step, one stop; refuses a non-mock gateway | Retry, redirect, non-mock submission, device access |
@@ -136,7 +139,9 @@ submission is then rejected and the run fails closed.
 | The run record is append-only, hash-chained and outside the repository | `RunStore`; `verify.txt`; gate scan |
 | No direct motion execution | static scan; gateway-only boundary; system lease |
 | Deterministic plans | SHA-256 over run, index, name, kind, profile and canonical params |
-| One submission per step | the runner's loop; no retry path |
+| One submission per step | the linear loop and the tree's single daemon worker; no retry path |
+| py_trees is imported only by `tree/runtime.py`; the default linear engine and the gate do not import it | import review; optional `tree` extra; tree tests skip without it |
+| The Run Supervisor owns deadline/cancel/one-stop on its own thread | `tree/runtime.py`; `tests/test_tree_runtime.py` |
 | Explicit per-session authorization | `Authorization` validation before any gateway call |
 | No fabricated result | terminal outcome copied from the gateway; unknown stays unknown |
 | No secrets or run data in git | gate scan; `.gitignore`; review |
@@ -153,6 +158,8 @@ submission is then rejected and the run fails closed.
 | Gateway does not advertise `mock` | Refused before a lease or submission |
 | Lease acquisition fails | `run` exits non-zero; nothing submitted |
 | Lease renewal fails during the run | One stop; later submissions are blocked; the run cannot succeed |
+| Tree deadline or cancel fires while a step is in flight | One stop; the in-flight step is `UNKNOWN`, the run is `INDETERMINATE`; a late `COMPLETED` is evidence only |
+| Tree deadline fires between steps | One stop; no step is submitted; `ABORTED` |
 | Gateway unreachable at preflight | `ABORTED`; nothing submitted |
 | Gateway unreachable during a submission | `INDETERMINATE`; one stop request; no retry |
 | `REJECTED` terminal result | `FAILED`; one stop request |

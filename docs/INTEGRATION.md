@@ -93,6 +93,15 @@ pre-empt it at any moment, and applies the deadman, limits and stop latch.
 - The application never acquires a token over SSH and never reads the robot's
   token file.
 
+### 4.1 Execution engine
+
+`run` defaults to the linear engine. `--engine tree` selects the opt-in
+py_trees engine; `--deadline-s` is available only there. The tree's independent
+Run Supervisor owns the deadline, cancellation and the one stop. A step in
+flight when the supervisor halts becomes `UNKNOWN` and the run is
+`INDETERMINATE`; a late `COMPLETED` is evidence only. py_trees is the optional
+`tree` extra and the licence review is open.
+
 ## 5. Failure semantics
 
 | Condition | Required behavior |
@@ -139,6 +148,7 @@ operator runbook.
 | v0.1.0 admission and offline core | `python3 -m pytest -q`; `bash scripts/check_repo_gate.sh` |
 | M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI `applications-gate` passed |
 | M3 supervised execution | Real `jcheng-system` gateway process + `MockStack` on loopback (L3, 2026-11-26): lease acquire/release, 3/3 steps, stop-on-rejection, hash-chained record. No robot. Evidence: `evidence/20261126_m3_supervised/` |
+| M1.5 tree engine | Opt-in `--engine tree` against the same system mock gateway (L3, 2026-11-26): 3/3 steps, lease released; L2 deadline/rejection/one-stop tests. Evidence: `evidence/20261126_m1_5_tree/` |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 
 No hardware claim is valid before M4. Synthetic, mock and replay results are

@@ -95,6 +95,18 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--evidence-class", choices=["L2", "L3"], default="L2"
     )
+    run.add_argument(
+        "--engine",
+        choices=["linear", "tree"],
+        default="linear",
+        help="tree requires the optional 'tree' extra (py_trees)",
+    )
+    run.add_argument(
+        "--deadline-s",
+        type=float,
+        default=None,
+        help="run deadline; tree engine only",
+    )
     return parser
 
 
@@ -153,6 +165,8 @@ def _run(args: argparse.Namespace) -> int:
         recipe_hash=hashlib.sha256(args.recipe.read_bytes()).hexdigest(),
         ttl_ms=args.ttl_ms,
         evidence_class=args.evidence_class,
+        engine=args.engine,
+        deadline_s=args.deadline_s,
     )
     print(
         json.dumps(

@@ -32,9 +32,9 @@ def contract_payload() -> dict[str, Any]:
     }
 
 
-def safety_payload() -> dict[str, Any]:
+def safety_payload(state: str = "ARMED_IDLE") -> dict[str, Any]:
     return {
-        "state": "ARMED_IDLE",
+        "state": state,
         "stop_latched": False,
         "seq": 1,
         "last_valid_state_at": NOW,
@@ -81,6 +81,9 @@ class _Probe:
         self.results: list[dict[str, Any]] = []
         self.fail_renew = False
         self.execute_status: int | None = None
+        self.execute_delay_s = 0.0
+        self.safety_state = "ARMED_IDLE"
+        self.stop_status: int | None = None
         self.lock = Lock()
 
     def record(self, method: str, path: str, headers: dict[str, str], body: Any) -> None:
@@ -120,7 +123,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, contract_payload())
             return
         if method == "GET" and path == "/v1/safety":
-            self._send(200, safety_payload())
+            self._send(200, safety_payload(probe.safety_state))
             return
         if method == "GET" and path == "/v1/state":
             self._send(200, state_payload())
@@ -157,6 +160,8 @@ class _Handler(BaseHTTPRequestHandler):
             if probe.execute_status is not None:
                 self._send(probe.execute_status, {"error": {"code": "TEST"}})
                 return
+            if probe.execute_delay_s:
+                time.sleep(probe.execute_delay_s)
             with probe.lock:
                 result = (
                     probe.results.pop(0)
@@ -168,11 +173,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, result)
             return
         if method == "POST" and path == "/v1/motion/stop":
+            if probe.stop_status is not None:
+                self._send(probe.stop_status, {"error": {"code": "TEST"}})
+                return
             self._send(
                 200,
                 {
                     "accepted": True,
-                    "safety": safety_payload(),
+                    "safety": safety_payload(probe.safety_state),
                     "message": "software stop requested",
                     "requested_at": NOW,
                 },

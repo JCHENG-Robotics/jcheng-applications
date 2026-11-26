@@ -8,6 +8,25 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- M1.5 opt-in production tree engine: `src/jcheng_applications/tree/runtime.py`
+  runs a `py_trees` `Sequence` over the shared `StepExecutor` with one daemon
+  worker (one in-flight step), a `StepLog` that separates completed and late
+  outcomes, and an independent `RunSupervisor` thread owning the run deadline,
+  cancellation and the one stop.
+- `jcheng-applications run --engine tree --deadline-s ...`: the tree engine is
+  selected explicitly; the default remains linear. A deadline/cancel with a
+  step in flight yields `UNKNOWN` and `INDETERMINATE`; a late `COMPLETED` is
+  evidence only.
+- Optional `tree` extra pinning `py_trees==2.6.0`, `pydot==4.0.1` and
+  `pyparsing==3.3.3`; CI installs it, the default gate does not need it, and
+  the tree tests skip on a bare interpreter.
+- `tests/test_tree_runtime.py` and `evidence/20261126_m1_5_tree/`: a 4-case
+  differential against the linear engine, rejection/one-stop, deadline/late
+  result, and an L3 run against the real system mock gateway (3/3 steps).
+- T-C06 in `tests/test_tree_regression.py`: 12 scripted cases with a fixed
+  clock assert exact `RunReport` equality between the linear and tree engines,
+  including steps, abort reason and stop error. Evidence:
+  `evidence/20261126_t_c06/`.
 - M3 supervised execution on the mock gateway: `write_transport.py` implements
   lease acquire/renew/release, one execute per step and one stop; it refuses a
   gateway whose health does not advertise `mock`. `lease.py` renews at
@@ -60,6 +79,9 @@ All notable changes to this project are documented here. Format based on
 
 ### Changed
 
+- The default execution engine stays linear. The py_trees engine is opt-in and
+  the `LICENSE-REVIEW.md` review of py_trees/pydot/pyparsing remains open; the
+  engine is not promoted to the default in this change.
 - `RECIPES.md` records the deployment constraint found in L3: the system
   profile accepts exactly one joint per `JOINT_STEP`; a multi-joint step is
   syntactically valid but rejected by the gateway. The shipped offline example
