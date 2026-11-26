@@ -133,7 +133,7 @@ operator runbook.
 | Stage | Evidence |
 |---|---|
 | v0.1.0 admission and offline core | `python3 -m pytest -q`; `bash scripts/check_repo_gate.sh` |
-| M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI pending |
+| M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI `applications-gate` passed |
 | M3 supervised execution | Paused by the system-side C2 probe; no submission path exists |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 

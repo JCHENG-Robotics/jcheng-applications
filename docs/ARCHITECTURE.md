@@ -58,6 +58,7 @@ Rules that come from the ecosystem and are not negotiable here:
 |---|---|---|---|
 | Recipe model | Operator laptop, in process | Parse and validate YAML against the pinned contract; reject unknown fields, kinds, scopes and payloads | Accepting an unversioned or unpinned contract |
 | Planner | Operator laptop, in process | Produce a stable `Plan` with one idempotency key per step | I/O, network, time-dependent keys, hidden randomness |
+| Shared execution core | Operator laptop, in process | Preflight, command construction, one submission per step, terminal classification and stop-once, used by every driver | Retrying an indeterminate motion, inventing a result, widening authorization |
 | Runner | Operator laptop, in process | Authorize, preflight, submit one intent per step, map the terminal result, request one stop on failure | Retrying an indeterminate motion, inventing a result, widening authorization |
 | Gateway port | Operator laptop, abstract | The only path to the robot; M2 implements read-only reads over HTTP | Device, ROS, SSH or vendor-SDK access |
 | Read-only transport (M2) | Operator laptop, in process | `GET /v1/health`, `/contract`, `/state` and `/safety` with bounded timeouts and strict parsing | POST, submission, stop, lease mutation, retry |

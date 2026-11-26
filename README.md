@@ -62,7 +62,8 @@ jcheng-applications/
 │   ├── model.py                    # recipe model, contract constants and planner
 │   ├── gateway.py                  # GatewayPort protocol and contract parsers
 │   ├── transport.py                # M2 read-only GET transport (no submission)
-│   ├── runner.py                   # fail-closed runner and run report
+│   ├── core/                       # shared preflight, command, classify, executor, stop-once
+│   ├── runner.py                   # fail-closed runner over the shared core
 │   └── cli.py                      # validate/plan plus read-only check CLI
 ├── tests/                          # contract, recipe, gateway, runner and CLI tests
 ├── scripts/check_repo_gate.sh      # repository gate (local and CI)
@@ -131,7 +132,8 @@ gateway in the tests.
 | The runner refuses missing authorization, scope gaps, a contract mismatch, a non-`ARMED_IDLE` safety state and a missing lease before submitting anything | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
 | A rejected, aborted, timed-out or unverified step stops the run and is never retried | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
 | No hardware, DDS or motion-execution path exists; network access is confined to the GET-only `transport.py` | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py` |
-| Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Partially verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; loopback mock only; CI pending |
+| Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
+| Shared Execution Core; linear and tree drivers use the same classifier | Partially verified (L2, 2026-11-26) | `tests/test_core.py`; M1.5 M15-K 11-case differential; `evidence/20261126_shared_core/`; full `RunReport` parity pending |
 | Intent submission to a real gateway | Unverified; M3 not implemented | C2/C5/C5b pass on the mock (r2); M3 unblocked |
 | Persisted run records and operator session linkage | Unverified | Not implemented (M2) |
 | Any hardware behavior | Unverified | No L5 session; no runtime |

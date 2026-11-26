@@ -27,26 +27,29 @@ All notable changes to this project are documented here. Format based on
 - The static boundary test now allows `http.client` in `transport.py` only
   and proves by AST that the adapter is GET-only.
 - `scripts/m1_5_pytrees_probe.py` and `docs/M1_5_VALIDATION.md`: isolated
-  validation of `py_trees==2.6.0` in a disposable venv. Nine checks pass:
+  validation of `py_trees==2.6.0` in a disposable venv. Eleven checks pass:
   non-blocking `RUNNING`, sequence memory, `terminate(INVALID)`, late future,
-  hung worker, app-side stop race, single worker, nominal call parity and an
-  independent supervisor thread (M15-J). The failure differential (M15-K)
-  compares final state, submitted command sequence/keys, step outcome/reason/
-  bus verification, stop count and stop-error presence across 11 cases against
-  the unmodified linear runner. `runner.py` is untouched and the Shared
-  Execution Core is not extracted.
+  hung worker, app-side stop race, single worker, nominal call parity, an
+  independent supervisor thread (M15-J) and an 11-case failure differential
+  (M15-K). After the core extraction, both drivers use the same
+  `StepExecutor`/`classify`.
 - The probe found that py_trees 2.6 declares `pydot>=1.4` (resolved 4.0.1 plus
   pyparsing); the licence review records it. It is not a runtime dependency.
 
 ### Changed
 
+- Extracted the Shared Execution Core into `src/jcheng_applications/core/`:
+  preflight, command construction, terminal classification, one submission per
+  step and stop-once. `runner.py` delegates to it with an unchanged public API
+  and the 89 v0.1.0 tests still pass. The M1.5 tree driver now calls the same
+  `StepExecutor`/`classify`, so the 11-case failure differential is structural
+  rather than a mirror. T-C06 is partially verified: the behavioural fields
+  match, the full `RunReport` object is not yet compared.
 - The roadmap records M2 as the mainline and states that M1.5 must not delay
   it, and that gateway concurrency probes are a prerequisite for hardware.
 - M3 is unblocked on the mock: the system-side R1–R4 revision now passes
   C1–C5, C5b and the stop/execute stress loop (r2 evidence). M3 is still not
-  implemented; the deployed gateway must repeat the probes before M4. M1.5
-  does not refactor `runner.py`; the Shared Execution Core is deferred until
-  M2 is stable.
+  implemented; the deployed gateway must repeat the probes before M4.
 
 ## [0.1.0] — 2026-11-26
 

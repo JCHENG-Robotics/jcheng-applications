@@ -47,12 +47,13 @@ from jcheng_applications.gateway import (  # noqa: E402
     MotionResult,
     SafetySnapshot,
 )
+from jcheng_applications.core.classify import Decision  # noqa: E402
+from jcheng_applications.core.executor import StepExecutor, StepOutcome  # noqa: E402
 from jcheng_applications.model import (  # noqa: E402
     CONTRACT_HASH,
     Authorization,
     build_plan,
     load_recipe,
-    requires_bus_verification,
 )
 from jcheng_applications.runner import TaskRunner, build_command  # noqa: E402
 
@@ -539,7 +540,7 @@ def check_golden_trace() -> dict[str, Any]:
     )
     return {
         "id": "M15-I",
-        "name": "nominal gateway-call parity with the unmodified linear runner",
+        "name": "nominal gateway-call parity with the linear runner",
         "status": "PASS" if passed else "FAIL",
         "observed": {
             "linear_submissions": len(linear_gateway.calls),
@@ -551,7 +552,7 @@ def check_golden_trace() -> dict[str, Any]:
             ],
             "stop_calls": {"linear": len(linear_gateway.stops), "tree": len(tree_gateway.stops)},
         },
-        "detail": "failure-path parity and report parity are deferred to Shared Core Regression",
+        "detail": "failure-path parity is covered by M15-K; full RunReport parity remains T-C06",
     }
 
 
@@ -717,32 +718,6 @@ def _result(
     )
 
 
-def decide(
-    step: Any,
-    outcome: str,
-    bus_verified: bool | None,
-    safety_state: str | None,
-    stop_latched: bool | None,
-) -> str:
-    """Mirror of the linear runner's post-submission decision table.
-
-    This is a temporary mirror for the differential; the Shared Execution Core
-    extraction will replace it with the real implementation.
-    """
-
-    if stop_latched or safety_state in {"STOP_LATCHED", "FAULT", "DISARMED"}:
-        return "ABORTED"
-    if outcome == "COMPLETED":
-        if requires_bus_verification(step.scopes) and not bus_verified:
-            return "INDETERMINATE"
-        return "CONTINUE"
-    if outcome == "REJECTED":
-        return "FAILED"
-    if outcome == "ABORTED":
-        return "ABORTED"
-    return "INDETERMINATE"
-
-
 class ClassifiedLeaf(py_trees.behaviour.Behaviour):
     def __init__(
         self,
@@ -755,7 +730,7 @@ class ClassifiedLeaf(py_trees.behaviour.Behaviour):
         super().__init__(step.name)
         self._step = step
         self._executor = executor
-        self._gateway = gateway
+        self._step_executor = StepExecutor(gateway)
         self._run_id = run_id
         self._lease_id = lease_id
         self.future = None
@@ -763,47 +738,30 @@ class ClassifiedLeaf(py_trees.behaviour.Behaviour):
         self.outcome: str | None = None
         self.reason_code: str | None = None
         self.bus_verified: bool | None = None
-        self.decision: str | None = None
+        self.decision: Decision | None = None
 
     def initialise(self) -> None:
         self.submitted = True
         self.future = self._executor.submit(self._work)
 
-    def _work(self) -> tuple[str, str, str, bool | None, str | None, bool | None]:
-        try:
-            command = build_command(
-                self._step, run_id=self._run_id, lease_id=self._lease_id
-            )
-            result = self._gateway.submit(command)
-        except Exception as exc:  # noqa: BLE001 - mirror the runner's UNKNOWN
-            return ("UNKNOWN", type(exc).__name__, str(exc), None, None, None)
-        if not isinstance(result, MotionResult):
-            return (
-                "UNKNOWN",
-                "GatewayProtocolError",
-                "gateway returned an unexpected result type",
-                None,
-                None,
-                None,
-            )
-        return (
-            result.outcome,
-            result.reason_code,
-            result.message,
-            result.bus_verified,
-            result.safety_state,
-            result.stop_latched,
+    def _work(self) -> StepOutcome:
+        return self._step_executor.submit(
+            self._step, run_id=self._run_id, lease_id=self._lease_id
         )
 
     def update(self) -> Status:
         if self.future is None or not self.future.done():
             return Status.RUNNING
-        outcome, code, _message, bus, safety, latched = self.future.result()
-        self.outcome = outcome
-        self.reason_code = code
-        self.bus_verified = bus
-        self.decision = decide(self._step, outcome, bus, safety, latched)
-        return Status.SUCCESS if self.decision == "CONTINUE" else Status.FAILURE
+        outcome = self.future.result()
+        self.outcome = outcome.report.outcome
+        self.reason_code = outcome.report.reason_code
+        self.bus_verified = outcome.report.bus_verified
+        self.decision = outcome.decision
+        return (
+            Status.SUCCESS
+            if outcome.decision is Decision.CONTINUE
+            else Status.FAILURE
+        )
 
 
 def run_tree_plan(
@@ -825,8 +783,8 @@ def run_tree_plan(
     executor.shutdown(wait=True)
     state = "SUCCEEDED"
     for leaf in leaves:
-        if leaf.decision is not None and leaf.decision != "CONTINUE":
-            state = leaf.decision
+        if leaf.decision is not None and leaf.decision is not Decision.CONTINUE:
+            state = leaf.decision.value
             break
     submitted = sum(1 for leaf in leaves if leaf.submitted)
     stop_error = None
@@ -908,7 +866,7 @@ def check_failure_differential() -> dict[str, Any]:
             failures.append({"case": name, "checks": checks})
     return {
         "id": "M15-K",
-        "name": "failure-path differential: tree mirror vs the unmodified linear runner",
+        "name": "failure-path differential: shared-core tree driver vs the linear runner",
         "status": "PASS" if not failures else "FAIL",
         "observed": {
             "cases": len(cases),
@@ -919,7 +877,7 @@ def check_failure_differential() -> dict[str, Any]:
                 "step outcome, reason code and bus verification",
                 "stop count and stop-error presence",
             ],
-            "note": "the decision mirror is temporary and is replaced by the Shared Execution Core (T-C06)",
+            "note": "both drivers call StepExecutor/classify; the linear runner was refactored to the same core (T-C06)",
         },
     }
 
