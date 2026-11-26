@@ -1,12 +1,14 @@
 """Static boundary check: no hardware, DDS, network or motion execution.
 
 Only executable and declarative sources are scanned; documentation may name
-the robot and the boundaries. The package is ROS-free and transport-free in
-v0.1.0, so a network client token is also a failure here.
+the robot and the boundaries. The package is ROS-free. From M2 a single
+read-only adapter, ``transport.py``, may import ``http.client``; every other
+source file must stay transport-free, and the adapter itself must be GET-only.
 """
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import yaml
@@ -51,6 +53,9 @@ FORBIDDEN = (
     "socket",
 )
 
+TRANSPORT = Path("src/jcheng_applications/transport.py")
+TOKEN_ALLOWLIST = {TRANSPORT: {"http.client"}}
+
 ARTIFACT_SUFFIXES = {
     ".pt",
     ".onnx",
@@ -78,12 +83,40 @@ def test_no_hardware_dds_network_or_motion_tokens() -> None:
     problems = []
     for path in _source_files():
         text = path.read_text(encoding="utf-8", errors="replace").lower()
+        allowed = TOKEN_ALLOWLIST.get(path.relative_to(ROOT), set())
         for token in FORBIDDEN:
-            if token in text:
+            if token in text and token not in allowed:
                 problems.append(f"{path.relative_to(ROOT)}: {token}")
     assert not problems, "forbidden hardware/DDS/network tokens found:\n" + "\n".join(
         problems
     )
+
+
+def test_transport_is_get_only_and_has_no_motion_call() -> None:
+    tree = ast.parse((ROOT / TRANSPORT).read_text(encoding="utf-8"))
+    strings = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    assert not ({"POST", "PUT", "PATCH", "DELETE"} & strings)
+    called = {
+        node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert not ({"submit", "stop", "execute", "arm", "reset"} & called)
+    requests = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "request"
+    ]
+    assert requests, "transport must issue its GET through http.client"
+    for call in requests:
+        assert call.args and isinstance(call.args[0], ast.Constant)
+        assert call.args[0].value == "GET"
 
 
 def test_no_model_weights_or_recordings() -> None:

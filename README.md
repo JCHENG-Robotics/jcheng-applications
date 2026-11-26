@@ -5,8 +5,10 @@
 > Status: **Experimental** as of 2026-11-26. Version 0.1.0.
 > Admission plus an offline task-orchestration core: recipe validation,
 > deterministic planning and a fail-closed runner over an abstract gateway
-> port. There is no HTTP/WS client, no runtime process and no robot contact.
-> Nothing in it is used by the running robot.
+> port. M2 adds one read-only transport (GET only, bounded timeouts, no
+> retry); no intent is submitted and there is no runtime process. M3 is
+> unblocked on the mock after the system-side C2 revision passed; it is not
+> implemented. Nothing here is used by the running robot.
 > English canonical; see [README.zh-CN.md](README.zh-CN.md) for the Chinese translation.
 
 `jcheng-applications` is the L4 task-orchestration application of the JCHENG
@@ -51,17 +53,22 @@ jcheng-applications/
 ├── docs/
 │   ├── ARCHITECTURE.md             # planes, components and the run state machine
 │   ├── INTEGRATION.md              # gateway contract, admission and failure semantics
-│   └── RECIPES.md                  # recipe format, steps, idempotency and authorization
+│   ├── RECIPES.md                  # recipe format, steps, idempotency and authorization
+│   ├── TASK_ENGINE.md              # design: tree executor, supervisor and strategy selection
+│   └── M1_5_VALIDATION.md          # isolated py_trees technical validation report
 ├── recipes/
 │   └── example-supervised-transfer.yaml  # offline example; not a hardware program
 ├── src/jcheng_applications/
 │   ├── model.py                    # recipe model, contract constants and planner
 │   ├── gateway.py                  # GatewayPort protocol and contract parsers
+│   ├── transport.py                # M2 read-only GET transport (no submission)
 │   ├── runner.py                   # fail-closed runner and run report
-│   └── cli.py                      # offline validate/plan CLI
+│   └── cli.py                      # validate/plan plus read-only check CLI
 ├── tests/                          # contract, recipe, gateway, runner and CLI tests
 ├── scripts/check_repo_gate.sh      # repository gate (local and CI)
+├── scripts/m1_5_pytrees_probe.py   # isolated candidate-runtime probe (not a runtime dependency)
 ├── evidence/20261126_scaffold/     # M0/M1 evidence record
+├── evidence/20261126_m1_5_pytrees/ # M1.5 isolated probe evidence
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -71,11 +78,17 @@ jcheng-applications/
 ## Requirements
 
 - Python 3.10 or newer (CI uses 3.12), `PyYAML` 6.x and `pytest` 7.4+.
+- `py_trees` 2.6 (BSD-3) is the candidate tree runtime for M1.5, subject to the
+  license review. v0.1.0 does not import it and it is not a dependency yet.
 - No ROS installation, now or later: this repository joins no DDS graph and
-  uses no RMW. The gateway is an HTTP/WS boundary (M2).
-- No robot, gateway or network listener for the gate, the tests or the CLI.
+  uses no RMW. The gateway is an HTTP/WS boundary.
+- The M2 transport uses the standard library `http.client`; no third-party
+  HTTP dependency is added. It is GET-only and has bounded timeouts.
+- The gate makes no network request. Transport tests bind an ephemeral
+  loopback port; no robot, gateway or network listener is required.
 - A `jcheng-system` gateway and an operator-authorized session are required for
-  any future execution (M2/M3). Neither is used by v0.1.0.
+  any execution (M3). M3 is unblocked on the mock but not implemented; the M2
+  `check` command reads only.
 
 ## Quick start
 
@@ -91,15 +104,22 @@ jcheng-applications validate recipes/example-supervised-transfer.yaml
 jcheng-applications plan recipes/example-supervised-transfer.yaml \
   --run-id demo-001 --json
 
+# M2 read-only admission: GET only, no motion. The token comes from the
+# environment and is never passed on the command line.
+export JCHENG_GATEWAY_URL=http://127.0.0.1:8766
+export JCHENG_GATEWAY_TOKEN=...   # set by the operator; never commit it
+jcheng-applications check --url "$JCHENG_GATEWAY_URL"
+
 # CI equivalent.
 python3 -m pytest -q
 bash scripts/check_repo_gate.sh
 ```
 
-There is deliberately **no `run` command** in v0.1.0. The gateway transport is
-M2; a command that appeared to run without a contract-checked gateway would
-invite a hardware claim this repository cannot support. The runner is exercised
-against an in-process fake gateway in the tests.
+There is deliberately **no `run` command**. `check` reads health, contract,
+state and safety and nothing else. A command that appeared to run without the
+M2/M3 gateway path and a passing C2 would invite a hardware claim this
+repository cannot support. The runner is exercised against an in-process fake
+gateway in the tests.
 
 ## Validation status
 
@@ -110,9 +130,9 @@ against an in-process fake gateway in the tests.
 | Plans are deterministic and idempotency keys are run-bound | Verified (L1, 2026-11-26) | `tests/test_recipe.py`; `src/jcheng_applications/model.py` |
 | The runner refuses missing authorization, scope gaps, a contract mismatch, a non-`ARMED_IDLE` safety state and a missing lease before submitting anything | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
 | A rejected, aborted, timed-out or unverified step stops the run and is never retried | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
-| No hardware, DDS, network client or motion-execution path exists in the tree | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py` |
-| HTTP/WS gateway client and live contract checks | Unverified | Not implemented (M2) |
-| Intent submission to a real gateway | Unverified | Not implemented (M3) |
+| No hardware, DDS or motion-execution path exists; network access is confined to the GET-only `transport.py` | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py` |
+| Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Partially verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; loopback mock only; CI pending |
+| Intent submission to a real gateway | Unverified; M3 not implemented | C2/C5/C5b pass on the mock (r2); M3 unblocked |
 | Persisted run records and operator session linkage | Unverified | Not implemented (M2) |
 | Any hardware behavior | Unverified | No L5 session; no runtime |
 

@@ -6,6 +6,48 @@ All notable changes to this project are documented here. Format based on
 
 ## [Unreleased]
 
+### Added
+
+- `docs/TASK_ENGINE.md`: design for a tree-based task engine, a shared
+  Execution Core, an independent Run Supervisor, declared recovery branches,
+  three-valued guards and a deterministic selector. Design only: no runtime,
+  no transport and no hardware path.
+- Roadmap M1.5 (offline task-engine validation, parallel to M2) and S3
+  (declared branches and selection).
+- `transport.py`: M2 read-only gateway client. Four GET reads (`/v1/health`,
+  `/v1/contract`, `/v1/state`, `/v1/safety`), bounded connect/read timeouts,
+  strict parsing, no retry, no redirect and a size bound. The token is sent
+  only to authenticated endpoints.
+- `jcheng-applications check`: read-only admission; prints the health,
+  contract and safety report and exits non-zero when the gateway is not
+  ready. No submission and no motion.
+- `tests/test_transport.py`: loopback mock coverage for GET-only behavior,
+  auth scoping, contract mismatch, timeout, unreachable, malformed and
+  oversized responses, and no retry.
+- The static boundary test now allows `http.client` in `transport.py` only
+  and proves by AST that the adapter is GET-only.
+- `scripts/m1_5_pytrees_probe.py` and `docs/M1_5_VALIDATION.md`: isolated
+  validation of `py_trees==2.6.0` in a disposable venv. Nine checks pass:
+  non-blocking `RUNNING`, sequence memory, `terminate(INVALID)`, late future,
+  hung worker, app-side stop race, single worker, nominal call parity and an
+  independent supervisor thread (M15-J). The failure differential (M15-K)
+  compares final state, submitted command sequence/keys, step outcome/reason/
+  bus verification, stop count and stop-error presence across 11 cases against
+  the unmodified linear runner. `runner.py` is untouched and the Shared
+  Execution Core is not extracted.
+- The probe found that py_trees 2.6 declares `pydot>=1.4` (resolved 4.0.1 plus
+  pyparsing); the licence review records it. It is not a runtime dependency.
+
+### Changed
+
+- The roadmap records M2 as the mainline and states that M1.5 must not delay
+  it, and that gateway concurrency probes are a prerequisite for hardware.
+- M3 is unblocked on the mock: the system-side R1–R4 revision now passes
+  C1–C5, C5b and the stop/execute stress loop (r2 evidence). M3 is still not
+  implemented; the deployed gateway must repeat the probes before M4. M1.5
+  does not refactor `runner.py`; the Shared Execution Core is deferred until
+  M2 is stable.
+
 ## [0.1.0] — 2026-11-26
 
 ### Added

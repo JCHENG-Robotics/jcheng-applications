@@ -2,7 +2,8 @@
 
 > 状态：**实验性**，2026-11-26。版本 0.1.0。
 > 准入骨架加离线任务编排核心：配方校验、确定性规划，以及面向抽象网关端口的
-> 失败关闭运行器。没有 HTTP/WS 客户端、没有运行进程，也不接触机器人。
+> 失败关闭运行器。M2 增加了一个只读传输（仅 GET、有界超时、不重试），
+> 不提交意图、没有运行进程。M3 因系统侧 C2 探针失败而暂停。
 > 运行中的机器人不会使用其中任何内容。
 > 本文为英文主文档的中文对照；如有歧义，以 [README.md](README.md) 为准。
 
@@ -43,17 +44,22 @@ jcheng-applications/
 ├── docs/
 │   ├── ARCHITECTURE.md             # 平面、组件与运行状态机
 │   ├── INTEGRATION.md              # 网关契约、准入与失败语义
-│   └── RECIPES.md                  # 配方格式、步骤、幂等与授权
+│   ├── RECIPES.md                  # 配方格式、步骤、幂等与授权
+│   ├── TASK_ENGINE.md              # 设计：树执行器、监督器与策略选择
+│   └── M1_5_VALIDATION.md          # py_trees 隔离技术验证报告
 ├── recipes/
 │   └── example-supervised-transfer.yaml  # 离线示例；不是硬件程序
 ├── src/jcheng_applications/
 │   ├── model.py                    # 配方模型、契约常量与规划器
 │   ├── gateway.py                  # GatewayPort 协议与契约解析
+│   ├── transport.py                # M2 只读 GET 传输（不提交意图）
 │   ├── runner.py                   # 失败关闭运行器与运行报告
-│   └── cli.py                      # 离线 validate/plan 命令行
+│   └── cli.py                      # validate/plan 与只读 check 命令行
 ├── tests/                          # 契约、配方、网关、运行器与 CLI 测试
 ├── scripts/check_repo_gate.sh      # 仓库门禁（本地与 CI）
+├── scripts/m1_5_pytrees_probe.py   # 候选运行时隔离探针（不是运行时依赖）
 ├── evidence/20261126_scaffold/     # M0/M1 证据记录
+├── evidence/20261126_m1_5_pytrees/ # M1.5 隔离探针证据
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -63,11 +69,14 @@ jcheng-applications/
 ## 依赖
 
 - Python 3.10 或更新版本（CI 使用 3.12）、`PyYAML` 6.x、`pytest` 7.4+。
+- `py_trees` 2.6（BSD-3）是 M1.5 的候选树运行时，尚待许可证审查。v0.1.0
+  不导入它，它目前也不是依赖。
 - 不需要 ROS，任何阶段都不需要：本仓库不加入 DDS 图，也不使用 RMW。网关是
-  HTTP/WS 边界（M2）。
-- 门禁、测试与 CLI 不需要机器人、网关或网络监听。
-- 未来的任何执行（M2/M3）都需要 `jcheng-system` 网关和经操作员授权的会话；
-  v0.1.0 都不使用。
+  HTTP/WS 边界。
+- M2 传输使用标准库 `http.client`，不引入第三方 HTTP 依赖；仅 GET，且有界超时。
+- 门禁不发起网络请求。传输测试绑定临时回环端口，不需要机器人、网关或网络监听。
+- 任何执行（M3）都需要 `jcheng-system` 网关和经操作员授权的会话；M3 已暂停，
+  M2 的 `check` 只读。
 
 ## 快速开始
 
@@ -83,14 +92,19 @@ jcheng-applications validate recipes/example-supervised-transfer.yaml
 jcheng-applications plan recipes/example-supervised-transfer.yaml \
   --run-id demo-001 --json
 
+# M2 只读准入：仅 GET，不产生运动。令牌只从环境变量读取，不放在命令行。
+export JCHENG_GATEWAY_URL=http://127.0.0.1:8766
+export JCHENG_GATEWAY_TOKEN=...   # 由操作员设置；不得提交
+jcheng-applications check --url "$JCHENG_GATEWAY_URL"
+
 # 与 CI 等价。
 python3 -m pytest -q
 bash scripts/check_repo_gate.sh
 ```
 
-v0.1.0 **刻意没有 `run` 命令**。网关传输属于 M2；在没有经过契约校验的网关时
-提供一个看似可运行的命令，会诱发本仓库无法支撑的硬件声明。运行器只在测试中
-针对进程内假网关进行验证。
+**刻意没有 `run` 命令**。`check` 只读健康、契约、状态与安全，不做其他事情。
+在 M2/M3 网关路径和 C2 结论之前提供看似可运行的命令，会诱发本仓库无法支撑的
+硬件声明。运行器只在测试中针对进程内假网关进行验证。
 
 ## 验证状态
 
@@ -101,9 +115,9 @@ v0.1.0 **刻意没有 `run` 命令**。网关传输属于 M2；在没有经过�
 | 计划确定，幂等键与运行绑定 | 已验证（L1，2026-11-26） | `tests/test_recipe.py`；`src/jcheng_applications/model.py` |
 | 运行器在提交任何内容前拒绝缺失授权、作用域不足、契约不匹配、非 `ARMED_IDLE` 安全状态与缺失租约 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
 | 被拒绝、中止、超时或未实测的步骤会停止运行，且绝不重试 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
-| 仓库中不存在硬件、DDS、网络客户端或运动执行路径 | 已验证（L0，2026-11-26） | `tests/test_no_hardware.py` |
-| HTTP/WS 网关客户端与实时契约检查 | 未验证 | 尚未实现（M2） |
-| 向真实网关提交意图 | 未验证 | 尚未实现（M3） |
+| 仓库中不存在硬件、DDS 或运动执行路径；网络访问只允许 GET-only 的 `transport.py` | 已验证（L0，2026-11-26） | `tests/test_no_hardware.py` |
+| 只读网关准入：四项 GET、有界超时、不重试、拒绝契约/鉴权/格式错误 | 部分验证（L2，2026-11-26） | `tests/test_transport.py`；仅回环 mock；CI 待跑 |
+| 向真实网关提交意图 | 未验证；M3 暂停 | `jcheng-system` C2 失败 |
 | 持久化运行记录与操作员会话关联 | 未验证 | 尚未实现（M2） |
 | 任何硬件行为 | 未验证 | 无 L5 会话；无运行时 |
 

@@ -1,8 +1,9 @@
 # Integration — jcheng-applications
 
-> Status: **Experimental** as of 2026-11-26. v0.1.0 has no runtime surface:
-> no transport, no gateway call and no intent submission exist. Everything
-> marked M2/M3 is planned, not implemented.
+> Status: **Experimental** as of 2026-11-26. The M2 read-only transport is
+> implemented locally: four GET reads, bounded timeouts, no retry. No intent
+> submission, stop or lease mutation exists. M3 is unblocked on the mock after
+> the system-side C2 revision and is not implemented.
 
 ## 1. Admission and discovery
 
@@ -42,6 +43,7 @@ is no second path: no SSH, no vendor SDK, no ROS topic, no serial device.
 | Health | `GET /v1/health` is unauthenticated liveness; it carries no motion authority |
 | Contract | `GET /v1/contract` returns `ContractInfo`; a hash or range mismatch refuses the run |
 | Safety | `GET /v1/safety` returns `SafetyState`; a run requires `ARMED_IDLE` and no stop latch |
+| State | `GET /v1/state` returns `truth` (`measured` or `commanded`), `verification`, `fresh`, `profile_hash` and `header.stamp`. A `commanded` snapshot is never treated as measurement |
 | Lease | The client session's lease reference is reported by the gateway; the system layer owns the lease and may revoke it |
 | Intent validation | `POST /v1/motion/validate` for a dry validation when M2 needs it |
 | Intent submission | `POST /v1/motion/execute` with the `Idempotency-Key` header; the gateway and system layer perform the motion |
@@ -131,8 +133,8 @@ operator runbook.
 | Stage | Evidence |
 |---|---|
 | v0.1.0 admission and offline core | `python3 -m pytest -q`; `bash scripts/check_repo_gate.sh` |
-| M2 read-only gateway client | contract, health and safety reads against a mock gateway (L2); contract-mismatch refusal |
-| M3 supervised execution | mock gateway proves lease binding, idempotency, stop and pre-emption (L3); persisted run report |
+| M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI pending |
+| M3 supervised execution | Paused by the system-side C2 probe; no submission path exists |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 
 No hardware claim is valid before M4. Synthetic, mock and replay results are

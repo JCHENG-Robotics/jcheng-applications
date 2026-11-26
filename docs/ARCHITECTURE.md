@@ -1,8 +1,15 @@
 # Architecture — jcheng-applications
 
 > Status: **Experimental** as of 2026-11-26. Version 0.1.0.
-> v0.1.0 is an offline core: no HTTP/WS client, no runtime process, no DDS
-> participant and no device path. The gateway adapter is planned for M2.
+> v0.1.0 is an offline core: no runtime process, no DDS participant and no
+> device path. M2 adds one read-only transport in `transport.py`: GET only,
+> bounded timeouts, no submission, no stop and no lease mutation. The write
+> path is M3; it is unblocked on the mock after the C2 revision and is not
+> implemented.
+>
+> The planned tree executor, shared Execution Core, Run Supervisor and strategy
+> selection are specified in [`TASK_ENGINE.md`](TASK_ENGINE.md). Design only:
+> none of them is implemented in v0.1.0.
 
 ## 1. Position in the ecosystem
 
@@ -52,7 +59,8 @@ Rules that come from the ecosystem and are not negotiable here:
 | Recipe model | Operator laptop, in process | Parse and validate YAML against the pinned contract; reject unknown fields, kinds, scopes and payloads | Accepting an unversioned or unpinned contract |
 | Planner | Operator laptop, in process | Produce a stable `Plan` with one idempotency key per step | I/O, network, time-dependent keys, hidden randomness |
 | Runner | Operator laptop, in process | Authorize, preflight, submit one intent per step, map the terminal result, request one stop on failure | Retrying an indeterminate motion, inventing a result, widening authorization |
-| Gateway port | Operator laptop, abstract | The only path to the robot; M2 implements it over HTTP/WS | Device, ROS, SSH or vendor-SDK access |
+| Gateway port | Operator laptop, abstract | The only path to the robot; M2 implements read-only reads over HTTP | Device, ROS, SSH or vendor-SDK access |
+| Read-only transport (M2) | Operator laptop, in process | `GET /v1/health`, `/contract`, `/state` and `/safety` with bounded timeouts and strict parsing | POST, submission, stop, lease mutation, retry |
 | Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code and intent identity per step | Relabelling a mock result as hardware, persisting secrets |
 | CLI | Operator laptop | Offline `validate` and `plan` only | A `run` command before M2 |
 
@@ -119,7 +127,7 @@ submission is then rejected and the run fails closed.
 |---|---|
 | No hardware access | `capability.yaml`; `tests/test_no_hardware.py` |
 | No DDS domain, `rclpy`, `ros2` CLI or vendor topic | static scan; review of every transport change |
-| No network client in v0.1.0 | static scan of `src/`, `scripts/` and `recipes/` |
+| Network access confined to `transport.py`; M2 is GET-only | static scan; AST test `test_transport_is_get_only_and_has_no_motion_call` |
 | No direct motion execution | static scan; gateway-only boundary; system lease |
 | Deterministic plans | SHA-256 over run, index, name, kind, profile and canonical params |
 | One submission per step | the runner's loop; no retry path |
@@ -145,6 +153,16 @@ submission is then rejected and the run fails closed.
 | Stop request fails | run state preserved; `stop_error` recorded |
 | Malformed gateway payload | `INDETERMINATE`; one stop request |
 
+The M2 read-only transport never enters the run state machine. Its failures are:
+
+| Condition | Behavior |
+|---|---|
+| `401` / `403` | `GatewayUnauthorized`; no retry; the operator fixes the credential |
+| `5xx`, connect error or read timeout | `GatewayUnavailable`; bounded; no fallback endpoint |
+| Non-200, redirect or `404` | `GatewayProtocolError`; the endpoint or contract is wrong |
+| Contract outside the pin | `GatewayContractMismatch`; admission refuses |
+| Malformed or oversized body | `GatewayProtocolError`; nothing is inferred |
+
 ## 7. Non-goals
 
 - Replacing the system layer's safety policy, lease, limits or stop latch.
@@ -161,4 +179,5 @@ submission is then rejected and the run fails closed.
 - [`jcheng-studio`](https://github.com/JCHENG-Robotics/jcheng-studio) — operator console and session authorization.
 - [`INTEGRATION.md`](INTEGRATION.md) — gateway admission, transport and failure rules.
 - [`RECIPES.md`](RECIPES.md) — recipe syntax, step kinds and authorization.
+- [`TASK_ENGINE.md`](TASK_ENGINE.md) — planned tree executor, supervisor, branches and selection (design only).
 - [README](../README.md) / [ROADMAP](../ROADMAP.md) / [ACCEPTANCE](../ACCEPTANCE.md).
