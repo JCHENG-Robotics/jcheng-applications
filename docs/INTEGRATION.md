@@ -138,6 +138,12 @@ operator runbook.
   never logged, exported, committed or placed in a URL query string.
 - Run reports and exported evidence live outside the repository from M3; the
   repository gate rejects databases, recordings and env files.
+- `verify <run-id> --store-dir <dir>` audits one stored record without a
+  network call or store creation. Exit `0` means the hash chain verifies and a
+  terminal `run_finished` entry exists, **not** that the run succeeded; `1`
+  covers a missing record, a broken chain or an incomplete run; `2` is a usage
+  error such as an unsafe run id. It prints the terminal state, step outcomes
+  and the recorded stop confirmation levels.
 - The repository ships no systemd unit for the robot and no DDS configuration.
   The laptop watchdog and its unit belong to `jcheng-ops`.
 - A restart is not a motion command. The runner does not resume a run after a
@@ -151,6 +157,7 @@ operator runbook.
 | M2 read-only gateway client | `GET`-only health, contract, state and safety reads against a loopback mock (L2, 2026-11-26); contract-mismatch, auth, timeout and unreachable refusal; no retry; CI `applications-gate` passed |
 | M3 supervised execution | Real `jcheng-system` gateway process + `MockStack` on loopback (L3, 2026-11-26): lease acquire/release, 3/3 steps, stop-on-rejection, hash-chained record. No robot. Evidence: `evidence/20261126_m3_supervised/` |
 | Stop confirmation receipt | Optional R5 fields parsed on both engines (L1–L3, 2026-11-26): absent → S1, explicit `backend_confirmed` → S2, `physical_stop` only `unverified`, stop failure → no level. The real system mock gateway (legacy response) records S1 only. Evidence: `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` |
+| Run-record audit | `verify` checks the hash chain and terminal entry, prints state/steps/stop levels, makes no network call and does not create the store (L1, 2026-11-26). Evidence: `tests/test_audit.py`; `evidence/20261126_record_audit/` |
 | M1.5 tree engine | Opt-in `--engine tree` against the same system mock gateway (L3, 2026-11-26): 3/3 steps, lease released; L2 deadline/rejection/one-stop tests. Evidence: `evidence/20261126_m1_5_tree/` |
 | M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
 

@@ -663,6 +663,7 @@ review is open; it does not prove hardware or physical safety.
 | Stop during an in-flight execute resolves the run | **Verified system-side**: C2/C2p r2 evidence; the app-side M3 run is linear, not a concurrency harness |
 | `UNKNOWN`/`TIMEOUT` blocks every later submission at the core | **Verified L2**: classification and stop-once tests |
 | Persisted, hash-chained run record; mock label preserved | **Verified L3**: `evidence/20261126_m3_supervised/` |
+| Read-only record audit: chain, terminal entry, stop levels; no network and no store creation | **Verified L1**: `tests/test_audit.py`; `evidence/20261126_record_audit/` |
 | Gateway concurrency evidence from `jcheng-system` is linked | **Verified**: C1–C5 r2 probes; deployed gateway still required for M4 |
 | Cancellation/deadline supervisor independent of the step loop | **Not implemented**: M1.5 production supervisor |
 
@@ -727,6 +728,7 @@ State is `Planned` for every row; this document does not claim a pass.
 | T-C04 | Exhaustive classification table (outcome × `bus_verified` × scope) | No decision gap | L1 |
 | T-C05 | Golden idempotency keys for v0.1.0 recipes | Key stability for existing plans | L1 |
 | T-C06 | **Shared Core regression**: linear and tree engines share `StepExecutor`/`classify`; `tests/test_tree_regression.py` asserts **exact `RunReport` equality** across 12 scripted cases with a fixed clock; the existing 89 tests pass unchanged. **Verified 2026-11-26** | The refactor changed no behaviour | L2 |
+| T-C07 | **Record audit**: complete record exits 0; tampered chain, missing record and a record without `run_finished` exit 1; unsafe run id exits 2; the audit does not create the store; stop levels are read from the record. **Verified 2026-11-26** | The audit reports record integrity, not run success | L1 |
 
 ### 16.3 Differential (tree vs linear)
 
@@ -878,6 +880,7 @@ result.
 - [`../evidence/20261126_waiting/`](../evidence/20261126_waiting/README.md) — WAITING_FOR_OPERATOR evidence.
 - [`../evidence/20261126_derived_plan/`](../evidence/20261126_derived_plan/README.md) — Derived Plan identity guard evidence.
 - [`../evidence/20261126_stop_confirmation/`](../evidence/20261126_stop_confirmation/README.md) — S1/S2 stop-receipt evidence (client-side; R5 schema pending).
+- [`../evidence/20261126_record_audit/`](../evidence/20261126_record_audit/README.md) — read-only run-record audit evidence.
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.

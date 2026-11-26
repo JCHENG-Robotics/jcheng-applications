@@ -73,7 +73,7 @@ Rules that come from the ecosystem and are not negotiable here:
 | Supervised run | Operator laptop, in process | Compose lease + runner + record for one recipe | Executing motion itself or bypassing the preflight |
 | Derived-plan guard | Operator laptop, in process | Require a verified predecessor, new recipe version, new run id and new authorization before any gateway call | Mutating a live plan, resuming an old run or widening authorization |
 | Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code, intent identity, selection records and the terminal `operator_required` flag per run | Relabelling a mock result as hardware, persisting secrets, granting motion authority |
-| CLI | Operator laptop | `validate`, `plan`, read-only `check`, mock-only `run` | Non-mock `run`; device or DDS access |
+| CLI | Operator laptop | `validate`, `plan`, read-only `check`, mock-only `run`, read-only `verify` | Non-mock `run`; device or DDS access; `verify` creates or edits nothing |
 
 The presentation surface is deliberately absent. `jcheng-studio` owns the
 operator UI, the session record and the authorization interaction; this
@@ -142,6 +142,7 @@ submission is then rejected and the run fails closed.
 | Network access confined to `transport.py` and `write_transport.py`; M2 is GET-only; M3 refuses non-mock gateways | static scan; AST test `test_transport_is_get_only_and_has_no_motion_call`; `check_mock` |
 | Lease acquired before the first submission and released on every terminal path | `LeaseSession`; `tests/test_supervised.py` |
 | The run record is append-only, hash-chained and outside the repository | `RunStore`; `verify.txt`; gate scan |
+| A record audit is read-only and reports integrity, not success | `verify`; `RunStore(create=False)`; `tests/test_audit.py` |
 | No direct motion execution | static scan; gateway-only boundary; system lease |
 | Deterministic plans | SHA-256 over run, index, name, kind, profile and canonical params |
 | One submission per step | the linear loop and the tree's single daemon worker; no retry path |
