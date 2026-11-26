@@ -1,6 +1,6 @@
 # jcheng-applications
 
-[简体中文](README.zh-CN.md) | **English**
+**English** | [简体中文](README.zh-CN.md)
 
 > Status: **Experimental** as of 2026-11-26. Version 0.1.0.
 > Admission plus an offline task-orchestration core: recipe validation,
@@ -9,7 +9,7 @@
 > retry); no intent is submitted and there is no runtime process. M3 is
 > unblocked on the mock after the system-side C2 revision passed; it is not
 > implemented. Nothing here is used by the running robot.
-> English canonical; see [README.zh-CN.md](README.zh-CN.md) for the Chinese translation.
+> English canonical; the Chinese README is a translation.
 
 `jcheng-applications` is the L4 task-orchestration application of the JCHENG
 ecosystem. It turns an operator-authored recipe into a deterministic sequence
