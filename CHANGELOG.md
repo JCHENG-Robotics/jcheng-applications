@@ -8,6 +8,13 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- Terminal `WAITING_FOR_OPERATOR` semantics: `RunReport.operator_required` and
+  `operator_reason`, set by both engines for unconfirmed/aborted outcomes, stop
+  failure, lease loss and required-branch/deadline/cancel. The CLI prints the
+  state and exits **3**; it has no motion authority and a resumption is a new
+  authorized run. Records persist both fields.
+- `tests/test_waiting.py` and `evidence/20261126_waiting/`: eight cases across
+  both engines plus a loopback CLI exit-3 test.
 - S3 v0 declared branches (recipe format 0.2, additive): optional `facts` and
   `branches`. A fact is a threshold on a positional
   `MotionResult.measured_positions[index]` from a main step and is
@@ -105,8 +112,9 @@ All notable changes to this project are documented here. Format based on
   anchor, ticks only the selected branch, and propagates a selected branch
   failure instead of falling back. Facts are positional arm positions only;
   named-joint and gripper facts need a `jcheng-interfaces` change (proposal
-  merged). A required branch with no candidate is `ABORTED` + one stop, not a
-  live `WAITING_FOR_OPERATOR`.
+  merged). A required branch with no candidate is a terminal
+  `WAITING_FOR_OPERATOR` (`operator_required` + exit 3), not a live channel;
+  a clean `REJECTED`/`FAILED` and a preflight refusal are not operator-required.
 - The default execution engine stays linear. The py_trees engine is opt-in and
   the `LICENSE-REVIEW.md` review of py_trees/pydot/pyparsing remains open; the
   engine is not promoted to the default in this change.

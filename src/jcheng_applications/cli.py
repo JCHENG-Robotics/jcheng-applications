@@ -173,6 +173,8 @@ def _run(args: argparse.Namespace) -> int:
             {
                 "run_id": result.report.run_id,
                 "state": result.report.state.value,
+                "operator_required": result.report.operator_required,
+                "operator_reason": result.report.operator_reason,
                 "steps": [
                     {
                         "index": step.index,
@@ -200,6 +202,15 @@ def _run(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    if result.report.operator_required:
+        # No motion authority in this state. The operator must inspect the
+        # system and, if needed, start a new authorized run.
+        print(
+            "WAITING_FOR_OPERATOR: "
+            + (result.report.operator_reason or "operator inspection required"),
+            file=sys.stderr,
+        )
+        return 3
     return 0 if result.report.state is RunState.SUCCEEDED else 1
 
 

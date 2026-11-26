@@ -472,18 +472,27 @@ a motion scope.
 ## 11. Human takeover
 
 `WAITING_FOR_OPERATOR` is a supervisor state with **no motion authority**.
+Implemented as a **terminal operator-required report**, not a live channel.
 
 | Aspect | Rule |
 |---|---|
-| Entry | `UNKNOWN`/`TIMEOUT`/unverified completion, stop failure, lease loss, required branch with no eligible candidate, operator cancel |
+| Entry | `UNKNOWN`/`TIMEOUT`/unverified completion, stop failure, lease loss, required branch with no eligible candidate, operator cancel/deadline |
 | On entry | Stop once (if anything was submitted), halt the tree, drain the worker with a bounded grace, release the lease if held, set `motion_blocked`, write evidence |
 | Authority | None. The state cannot submit, validate, arm, reset or clear the latch |
 | Exit | Operator closes the run (`CLOSED`), or starts a new run with a new authorization |
 | No resume | v0.2 has no in-process resume; a restart is not a motion command |
 | Future | A live handover channel (studio ↔ applications) is a contract review item, not part of v0.2 |
 
-The CLI must print the state, the run id, the evidence path and the last gateway
-reason code, and exit non-zero. It must not prompt for "retry".
+The machine-readable fields are `RunReport.operator_required` and
+`operator_reason`. Both engines set them: an `ABORTED`/`INDETERMINATE` step
+outcome sets them, a stop failure overrides the reason, and the tree supervisor
+adds required-branch, deadline and cancel reasons. A clean `REJECTED`/`FAILED`
+and a preflight refusal do **not** set them.
+
+The CLI prints `WAITING_FOR_OPERATOR: <reason>` on stderr, includes both fields
+in its JSON and exits **3**. Exit 1 remains `FAILED`/`ABORTED` without operator
+inspection, 2 usage/record failure, 0 `SUCCEEDED`. It never prompts for
+"retry".
 
 ## 12. Evidence
 
@@ -639,7 +648,7 @@ There is no application-layer workaround for a gateway defect.
 | Recipe format with `facts` and `branches` validates; v0.1.0 recipes unchanged | **Verified L1**: `tests/test_branches.py` |
 | Branch scopes are part of the recipe union and must be authorized | **Verified L1**: scope-union test |
 | Selector is three-valued, deterministic and cannot read execution outcomes | **Verified L1/L2**: guard table, no-branch-on-failure test |
-| No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | **Partially verified**: both engines are `ABORTED` + one stop; live `WAITING_FOR_OPERATOR` is not implemented |
+| No eligible required branch enters `WAITING_FOR_OPERATOR`; optional branch continues | **Verified as a terminal state**: both engines set `operator_required`, stop once and exit 3; a live handover channel is not implemented |
 | Derived Plan requires a new version, run id and authorization | **Documented only**: no run registry enforces predecessor identity |
 | Proposal artifact accepts only `params`/`skill`, requires a hash and is recorded | **Not implemented** |
 | Everything above runs against a mock gateway only | **Verified L3**: real system mock gateway + `MockStack`, no robot; both engines execute the same branch plan with exact report parity |
@@ -812,9 +821,10 @@ result.
    Named-joint and gripper facts need a `jcheng-interfaces` change; the
    proposal is `docs/proposals/measured-facts-named.md` in that repository.
    Owner: `jcheng-interfaces`.
-4. **Operator channel.** Is `WAITING_FOR_OPERATOR` only a process state with a
-   non-zero exit, or does `jcheng-studio` need a live channel? The latter is a
-   contract review item. Owner: `jcheng-studio`.
+4. **Operator channel (partially answered).** `WAITING_FOR_OPERATOR` is now a
+   terminal report state with CLI exit 3 and no motion authority. A live
+   handover/resume channel remains a `jcheng-studio` contract review item.
+   Owner: `jcheng-studio`.
 5. **Evidence retention and redaction.** How long are run records kept, and are
    canonical commands retained or only hashed? Owner: operations.
 6. **`measured_positions` stability (open, now central to facts).** The array
@@ -834,6 +844,7 @@ result.
 - [`M1_5_VALIDATION.md`](M1_5_VALIDATION.md) — py_trees probe, tree engine and T-C06.
 - [`../evidence/20261126_s3_branches/`](../evidence/20261126_s3_branches/README.md) — S3 v0 linear-engine L3 evidence.
 - [`../evidence/20261126_s3_tree/`](../evidence/20261126_s3_tree/README.md) — S3 tree-engine L3 and branch parity evidence.
+- [`../evidence/20261126_waiting/`](../evidence/20261126_waiting/README.md) — WAITING_FOR_OPERATOR evidence.
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.
