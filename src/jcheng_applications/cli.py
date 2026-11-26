@@ -96,6 +96,14 @@ def _parser() -> argparse.ArgumentParser:
         "--evidence-class", choices=["L2", "L3"], default="L2"
     )
     run.add_argument(
+        "--derived-from",
+        default=None,
+        help=(
+            "predecessor run id; requires a new recipe version, run id and "
+            "authorization session"
+        ),
+    )
+    run.add_argument(
         "--engine",
         choices=["linear", "tree"],
         default="linear",
@@ -167,11 +175,13 @@ def _run(args: argparse.Namespace) -> int:
         evidence_class=args.evidence_class,
         engine=args.engine,
         deadline_s=args.deadline_s,
+        derived_from=args.derived_from,
     )
     print(
         json.dumps(
             {
                 "run_id": result.report.run_id,
+                "derived_from": result.derived_from,
                 "state": result.report.state.value,
                 "operator_required": result.report.operator_required,
                 "operator_reason": result.report.operator_reason,

@@ -68,6 +68,7 @@ Rules that come from the ecosystem and are not negotiable here:
 | Lease session | Operator laptop, in process | Acquire before the first submission, renew at `ttl/3`, release on every terminal path | Holding safety authority; retrying a lost lease |
 | Run store | Operator laptop, file | Append-only, hash-chained JSONL outside the repository, mode 0600 | Tokens, raw lease ids, recordings in git |
 | Supervised run | Operator laptop, in process | Compose lease + runner + record for one recipe | Executing motion itself or bypassing the preflight |
+| Derived-plan guard | Operator laptop, in process | Require a verified predecessor, new recipe version, new run id and new authorization before any gateway call | Mutating a live plan, resuming an old run or widening authorization |
 | Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code, intent identity, selection records and the terminal `operator_required` flag per run | Relabelling a mock result as hardware, persisting secrets, granting motion authority |
 | CLI | Operator laptop | `validate`, `plan`, read-only `check`, mock-only `run` | Non-mock `run`; device or DDS access |
 

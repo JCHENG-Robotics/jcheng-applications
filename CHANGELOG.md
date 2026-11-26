@@ -8,6 +8,16 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- Derived Plan identity guard: `run --derived-from <run-id>` requires a
+  hash-chain-verified predecessor record, the same recipe name, a new recipe
+  version, a new run id and a new authorization session. The guard runs before
+  `check_mock`, lease acquisition or any gateway call; a violation raises
+  `DerivedPlanError` and exits 2 with nothing submitted. The derived
+  `run_started` record carries `derived_from`.
+- `RunStore.load_started` (verified predecessor lookup) and
+  `write_report(..., derived_from=...)`; `tests/test_derived.py` and
+  `evidence/20261126_derived_plan/` cover the rules, a tampered chain and a
+  no-gateway refusal.
 - Terminal `WAITING_FOR_OPERATOR` semantics: `RunReport.operator_required` and
   `operator_reason`, set by both engines for unconfirmed/aborted outcomes, stop
   failure, lease loss and required-branch/deadline/cancel. The CLI prints the

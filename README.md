@@ -87,6 +87,7 @@ jcheng-applications/
 ├── evidence/20261126_s3_branches/  # S3 declared-branch linear L3 evidence
 ├── evidence/20261126_s3_tree/      # S3 tree branch L3 and parity evidence
 ├── evidence/20261126_waiting/      # WAITING_FOR_OPERATOR evidence
+├── evidence/20261126_derived_plan/ # Derived Plan identity guard evidence
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -152,7 +153,9 @@ hash-chained record outside the repository. `check` reads health, contract,
 state and safety and nothing else. No command opens a device, joins DDS or
 executes motion itself. Exit codes: 0 `SUCCEEDED`, 1 `FAILED`/`ABORTED`,
 2 usage or record failure, **3 `WAITING_FOR_OPERATOR`** (no motion authority;
-inspect and start a new authorized run).
+inspect and start a new authorized run). `run --derived-from <run-id>` requires
+a verified predecessor record plus a new recipe version, run id and
+authorization session; a violation refuses before any gateway call.
 
 ## Validation status
 
@@ -169,6 +172,7 @@ inspect and start a new authorized run).
 | Opt-in py_trees engine + independent deadline/cancel/stop supervisor | Verified (L2/L3, 2026-11-26) | `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/`; py_trees extra not default; licence review open |
 | Declared branches + positional arm facts + three-valued selector (both engines) | Verified (L1–L3, 2026-11-26) | `tests/test_branches.py`; `tests/test_tree_branches.py`; `evidence/20261126_s3_branches/`, `evidence/20261126_s3_tree/`; named/gripper facts pending |
 | Terminal `WAITING_FOR_OPERATOR`: `operator_required` + CLI exit 3, no motion authority | Verified (L2, 2026-11-26) | `tests/test_waiting.py`; `evidence/20261126_waiting/`; live channel not implemented |
+| Derived Plan identity: verified predecessor, new recipe version, run id and authorization session before any gateway call | Verified (L1/L2, 2026-11-26) | `tests/test_derived.py`; `evidence/20261126_derived_plan/` |
 | Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
 | Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
 | Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |
