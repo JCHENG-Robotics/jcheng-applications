@@ -109,6 +109,8 @@ def _report_payload(report: Any) -> dict[str, Any]:
         ],
         "abort_reason": report.abort_reason,
         "stop_error": report.stop_error,
+        "operator_required": report.operator_required,
+        "operator_reason": report.operator_reason,
         "selections": [
             {
                 "after_step": record.after_step,

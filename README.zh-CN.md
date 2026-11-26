@@ -77,6 +77,7 @@ jcheng-applications/
 ├── evidence/20261126_t_c06/        # T-C06 完整 RunReport 对齐证据
 ├── evidence/20261126_s3_branches/  # S3 声明分支线性 L3 证据
 ├── evidence/20261126_s3_tree/      # S3 树分支 L3 与对齐证据
+├── evidence/20261126_waiting/      # WAITING_FOR_OPERATOR 证据
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -134,7 +135,8 @@ bash scripts/check_repo_gate.sh
 `run` 是唯一会提交运动的命令，且仅限 mock：健康接口未声明 `mock` 的网关一律
 拒绝；它要求显式 `Authorization` 记录，获取并释放客户端租约，并把哈希链记录写
 在仓库外。`check` 只读健康、契约、状态与安全。任何命令都不打开设备、不加入
-DDS，也不自行执行运动。
+DDS，也不自行执行运动。退出码：0 `SUCCEEDED`，1 `FAILED`/`ABORTED`，2 用法或
+记录写入失败，**3 `WAITING_FOR_OPERATOR`**（无运动权限，需检查并重新授权）。
 
 ## 验证状态
 
@@ -150,6 +152,7 @@ DDS，也不自行执行运动。
 | Shared Execution Core；线性与树引擎 | 已验证（L2，2026-11-26） | `tests/test_core.py`；T-C06 12 例完整 `RunReport` 对齐；`evidence/20261126_shared_core/`、`evidence/20261126_t_c06/` |
 | 可选 py_trees 引擎 + 独立 deadline/cancel/stop 监督器 | 已验证（L2/L3，2026-11-26） | `tests/test_tree_runtime.py`；`evidence/20261126_m1_5_tree/`；py_trees 非默认；许可证审查未关闭 |
 | 声明分支 + 位置索引 arm 事实 + 三值选择器（两个引擎） | 已验证（L1–L3，2026-11-26） | `tests/test_branches.py`；`tests/test_tree_branches.py`；`evidence/20261126_s3_branches/`、`evidence/20261126_s3_tree/`；命名/gripper 事实待补 |
+| 终态 `WAITING_FOR_OPERATOR`：`operator_required` + CLI 退出码 3，无运动权限 | 已验证（L2，2026-11-26） | `tests/test_waiting.py`；`evidence/20261126_waiting/`；实时接管通道未实现 |
 | 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
 | 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
 | 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |

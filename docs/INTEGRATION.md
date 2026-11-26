@@ -121,7 +121,8 @@ flight when the supervisor halts becomes `UNKNOWN` and the run is
 | `MotionResult.outcome = ABORTED` | `ABORTED`; one stop request |
 | `MotionResult.outcome = TIMEOUT` or `UNKNOWN` | `INDETERMINATE`; one stop request |
 | `COMPLETED` without `bus_verified` for arm/gripper/full | `INDETERMINATE`; one stop request |
-| Stop path fails | run state preserved; `stop_error` recorded; operator notified |
+| Stop path fails | run state preserved; `stop_error` recorded; `operator_required` set; exit 3 |
+| Unconfirmed/aborted outcome, lease loss or required branch with no candidate | `operator_required` set; exit 3; no motion authority |
 | Run record cannot be written | The report is still returned; `record_error` is set and `run` exits 2; the motion may have happened |
 
 The application has no authority to reset the system layer. A wedged gateway or

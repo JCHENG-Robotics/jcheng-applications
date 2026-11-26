@@ -58,6 +58,8 @@ class RunReport:
     abort_reason: str | None
     stop_error: str | None
     selections: tuple[SelectionRecord, ...] = ()
+    operator_required: bool = False
+    operator_reason: str | None = None
 
 
 def _utcnow() -> datetime:
@@ -83,6 +85,8 @@ def make_report(
     abort_reason: str | None,
     stop_error: str | None,
     selections: tuple[SelectionRecord, ...] = (),
+    operator_required: bool = False,
+    operator_reason: str | None = None,
 ) -> RunReport:
     """Assemble a report without inferring or interpolating a value."""
 
@@ -100,6 +104,8 @@ def make_report(
         abort_reason=abort_reason,
         stop_error=stop_error,
         selections=selections,
+        operator_required=operator_required,
+        operator_reason=operator_reason,
     )
 
 
@@ -187,6 +193,8 @@ class TaskRunner:
         main_outcomes: dict[str, StepOutcome] = {}
         state = RunState.SUCCEEDED
         abort_reason: str | None = None
+        operator_required = False
+        operator_reason: str | None = None
 
         for step in plan.steps:
             outcome = executor.submit(step, run_id=run_id, lease_id=lease_id)
@@ -198,6 +206,12 @@ class TaskRunner:
                     Decision.INDETERMINATE: RunState.INDETERMINATE,
                 }[outcome.decision]
                 abort_reason = outcome.reason
+                if outcome.decision in (
+                    Decision.ABORTED,
+                    Decision.INDETERMINATE,
+                ):
+                    operator_required = True
+                    operator_reason = outcome.reason
                 break
             main_outcomes[step.name] = outcome
 
@@ -215,6 +229,8 @@ class TaskRunner:
                         f"required branch after {step.name!r} has no eligible "
                         "candidate"
                     )
+                    operator_required = True
+                    operator_reason = abort_reason
                     break
                 continue
 
@@ -231,6 +247,12 @@ class TaskRunner:
                         Decision.INDETERMINATE: RunState.INDETERMINATE,
                     }[branch_outcome.decision]
                     abort_reason = branch_outcome.reason
+                    if branch_outcome.decision in (
+                        Decision.ABORTED,
+                        Decision.INDETERMINATE,
+                    ):
+                        operator_required = True
+                        operator_reason = branch_outcome.reason
                     failed = True
                     break
             if failed:
@@ -238,6 +260,9 @@ class TaskRunner:
 
         if state is not RunState.SUCCEEDED and step_reports:
             stop_once.request(self._gateway, abort_reason or state.value)
+            if stop_once.error is not None:
+                operator_required = True
+                operator_reason = f"stop request failed: {stop_once.error}"
 
         return self._report(
             recipe=recipe,
@@ -250,6 +275,8 @@ class TaskRunner:
             abort_reason=abort_reason,
             stop_error=stop_once.error,
             selections=tuple(selections),
+            operator_required=operator_required,
+            operator_reason=operator_reason,
         )
 
     def _report(
@@ -265,6 +292,8 @@ class TaskRunner:
         abort_reason: str | None,
         stop_error: str | None,
         selections: tuple[SelectionRecord, ...] = (),
+        operator_required: bool = False,
+        operator_reason: str | None = None,
     ) -> RunReport:
         return make_report(
             recipe=recipe,
@@ -278,4 +307,6 @@ class TaskRunner:
             abort_reason=abort_reason,
             stop_error=stop_error,
             selections=selections,
+            operator_required=operator_required,
+            operator_reason=operator_reason,
         )

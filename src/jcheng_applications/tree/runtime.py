@@ -474,6 +474,8 @@ def run_tree(
 
     state = RunState.SUCCEEDED
     abort_reason: str | None = None
+    operator_required = False
+    operator_reason: str | None = None
     in_flight = False
     reports: list[StepReport] = []
     for outcome in list(log.outcomes):
@@ -481,6 +483,12 @@ def run_tree(
         if outcome.decision is not Decision.CONTINUE:
             state = _state_for(outcome.decision)
             abort_reason = outcome.reason
+            if outcome.decision in (
+                Decision.ABORTED,
+                Decision.INDETERMINATE,
+            ):
+                operator_required = True
+                operator_reason = outcome.reason
     for leaf in all_leaves:
         if leaf.started and leaf.outcome is None:
             in_flight = True
@@ -498,6 +506,17 @@ def run_tree(
             state = RunState.ABORTED
         if abort_reason is None:
             abort_reason = supervisor.reason or "run stopped"
+        reason = supervisor.reason or ""
+        if (
+            "required branch" in reason
+            or reason == "deadline"
+            or "cancel" in reason.lower()
+        ):
+            operator_required = True
+            operator_reason = reason
+    if supervisor.stop_error is not None:
+        operator_required = True
+        operator_reason = f"stop request failed: {supervisor.stop_error}"
 
     return make_report(
         recipe=recipe,
@@ -511,4 +530,6 @@ def run_tree(
         abort_reason=abort_reason,
         stop_error=supervisor.stop_error,
         selections=tuple(selections),
+        operator_required=operator_required,
+        operator_reason=operator_reason,
     )

@@ -68,7 +68,7 @@ Rules that come from the ecosystem and are not negotiable here:
 | Lease session | Operator laptop, in process | Acquire before the first submission, renew at `ttl/3`, release on every terminal path | Holding safety authority; retrying a lost lease |
 | Run store | Operator laptop, file | Append-only, hash-chained JSONL outside the repository, mode 0600 | Tokens, raw lease ids, recordings in git |
 | Supervised run | Operator laptop, in process | Compose lease + runner + record for one recipe | Executing motion itself or bypassing the preflight |
-| Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code and intent identity per step | Relabelling a mock result as hardware, persisting secrets |
+| Run report | Operator laptop, in memory | Preserve the gateway's outcome, reason code, intent identity, selection records and the terminal `operator_required` flag per run | Relabelling a mock result as hardware, persisting secrets, granting motion authority |
 | CLI | Operator laptop | `validate`, `plan`, read-only `check`, mock-only `run` | Non-mock `run`; device or DDS access |
 
 The presentation surface is deliberately absent. `jcheng-studio` owns the
@@ -123,6 +123,7 @@ human by itself.
 | Whether the session is authorized | `jcheng-studio` (human-facing) and the operator-supplied `Authorization` record |
 | Whether a step completed | The gateway's terminal `MotionResult`; the application only interprets it |
 | Whether a run is a hardware result | The evidence record, not the run state |
+| Whether the operator must inspect before any new run | `RunReport.operator_required`; the report grants no motion authority |
 
 The application holds a client-side lease **reference**, never the lease
 itself. The system layer may revoke or pre-empt it at any moment; the next
@@ -166,7 +167,9 @@ submission is then rejected and the run fails closed.
 | `ABORTED` terminal result | `ABORTED`; one stop request |
 | `TIMEOUT` or `UNKNOWN` terminal result | `INDETERMINATE`; one stop request; operator inspection |
 | `COMPLETED` without `bus_verified` on an arm/gripper/full step | `INDETERMINATE`; one stop request |
-| Stop request fails | run state preserved; `stop_error` recorded |
+| Stop request fails | run state preserved; `stop_error` recorded; `operator_required` set; exit 3 |
+| Unconfirmed/aborted outcome, lease loss or required branch with no candidate | `operator_required` and `operator_reason` set; exit 3; no motion authority |
+| Clean `REJECTED`/`FAILED` or preflight refusal | `operator_required` stays false; exit 1 (or 2 for a record failure) |
 | Malformed gateway payload | `INDETERMINATE`; one stop request |
 
 The M2 read-only transport never enters the run state machine. Its failures are:
