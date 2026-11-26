@@ -1,72 +1,66 @@
 # Acceptance report — jcheng-applications
 
-> Status: **pass** as of 2026-11-26 for v0.1.0.
+> Status: **pass** as of 2026-11-26 for v0.1.0, limited to the offline/mock/L3
+> scope.
 > Operator: JerichoCheng. Reviewer: pending.
-> Scope: the repository scaffold, the offline orchestration core and its
-> mock-gateway tests. The local gate, 89 tests and CI `applications-gate` pass
-> on `da140ae`.
-> No gateway is contacted, no intent is submitted to a real system and no
-> device is opened. No hardware claim is made.
+> Scope: repository scaffold, offline orchestration core, M2 read-only transport,
+> M3 supervised run against the real system mock gateway, and the S3
+> branch/tree/WAITING/derived-plan features.
+> No hardware is used, no deployed gateway is contacted and no robot motion is
+> claimed.
 
 ## 1. Gates
 
 | Gate | Command | Level | Result | Evidence |
 |---|---|---|---|---|
-| Repository gate | `bash scripts/check_repo_gate.sh` | L0 | pass (local, 2026-11-26) | `evidence/20261126_scaffold/gate.txt` |
-| Unit tests | `python3 -m pytest -q` | L1 | pass (89 tests, local, 2026-11-26) | `tests/` |
-| Offline runner against a fake gateway | `python3 -m pytest -q tests/test_runner.py` | L2 | pass (local, 2026-11-26) | `tests/test_runner.py` |
-| CLI validate/plan | `jcheng-applications validate` / `plan` | L1 | pass (local, 2026-11-26) | `tests/test_cli.py` |
-| CI | `.github/workflows/ci.yml` job `applications-gate` | L0/L1/L2 | pass ([run 45738303645](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45738303645)) | `evidence/20261126_scaffold/README.md` |
-| Mock end-to-end through a gateway process | — | L3 | not applicable (no transport) | — |
-| Replay of a recorded run | — | L4 | not applicable (no persisted run) | — |
-| Hardware | — | L5 | not applicable; no hardware session authorized | — |
+| Repository gate | `bash scripts/check_repo_gate.sh` | L0 | pass | local, 2026-11-26 |
+| Unit tests (with tree extra) | `python3 -m pytest -q` | L1 | pass (181 tests) | `tests/` |
+| Unit tests (default extras) | `python3 -m pytest -q` | L1 | pass (161 passed, 3 skipped) | `tests/` |
+| Offline runner against a fake gateway | `pytest -q tests/test_runner.py` | L2 | pass | `tests/test_runner.py` |
+| M2 read-only transport | loopback mock gateway | L2 | pass (GET only, no retry, contract mismatch refusal) | `evidence/20261126_m2_transport/` |
+| M3 supervised run | real `jcheng-system` mock gateway + `MockStack` | L3 | pass (lease, idempotency, persisted hash-chained record) | `evidence/20261126_m3_supervised/` |
+| S3 declared branches — linear engine | mock gateway | L3 | pass (fact index 0=0.03, branch selected, 2/2 steps) | `evidence/20261126_s3_branches/` |
+| S3 declared branches — tree engine | exact linear/tree report parity | L3 | pass | `evidence/20261126_s3_tree/` |
+| WAITING_FOR_OPERATOR | both engines + loopback CLI | L2–L3 | pass (CLI exit 3, no motion authority) | `evidence/20261126_waiting/` |
+| Derived-plan guard | verified predecessor before any gateway call | L3 | pass (zero-request refusal) | `evidence/20261126_derived_plan/` |
+| P0 C1–C5 (system dependency) | `jcheng-system` concurrency probe | L3 | pass (zero double terminals) | `jcheng-system/e2e/reports/20261126_concurrency_probe_r2/` |
+| Hardware | — | L5 | not run | — |
 
 ## 2. Verified claims
 
 | Claim | Level | Evidence |
 |---|---|---|
-| The manifest parses, matches `VERSION`, pins the v0.1.0 contract hash and declares `hardware_access: none` with an empty runtime surface | L0 | `capability.yaml`; `tests/test_contract.py` |
-| Recipes are rejected for an unknown field, kind, profile, scope, parameter, duplicate step name, scope-union mismatch or a non-finite value | L1 | `tests/test_recipe.py` |
-| A recipe with an arm, gripper or full scope must require a verified bus read; a gripper command must set its nested `verify_bus` | L1 | `tests/test_recipe.py` |
-| Plans are deterministic for the same run and payload and produce different keys for a different run or payload | L1 | `tests/test_recipe.py` |
-| The runner refuses missing approval, a scope gap, a naive authorization timestamp, a contract mismatch, a non-`ARMED_IDLE` safety state and a missing lease before submitting anything | L2 | `tests/test_runner.py` |
-| A rejected, aborted, timed-out, unknown or unverified step stops the run, requests one stop and is never retried | L2 | `tests/test_runner.py` |
-| A completion without a verified bus read is `INDETERMINATE` for arm and gripper steps; a base pulse does not require that proof | L2 | `tests/test_runner.py` |
-| A submission exception is treated as an unknown outcome and is not retried | L2 | `tests/test_runner.py` |
-| A stop failure is recorded without hiding the run state | L2 | `tests/test_runner.py` |
-| No device path, ROS/DDS interface, vendor topic, network client or motion-execution call appears in source, recipes or scripts | L0 | `tests/test_no_hardware.py` |
-| No model weight, run database, operator env file or oversized file is tracked | L0 | `scripts/check_repo_gate.sh` |
-| The required document set exists and relative links resolve | L0 | `scripts/check_repo_gate.sh` |
+| The manifest declares `hardware_access: none`, pins the v0.1.0 contract hash and has no runtime surface | L0 | `capability.yaml`; `tests/test_contract.py` |
+| Recipes validate deterministically and plans produce stable idempotency keys | L1 | `tests/test_recipe.py` |
+| The runner refuses missing authorization, scope gaps, contract mismatch, non-`ARMED_IDLE` safety and missing lease before submitting | L2 | `tests/test_runner.py` |
+| A failed, timed-out, unknown or unverified step requests one stop and is never retried | L2 | `tests/test_runner.py` |
+| M2 reads gateway health/contract/state/safety with GET only, bounded timeouts, no retry and no fallback | L2 | `tests/test_transport.py` |
+| M3 acquires and releases a lease, submits one recipe with stable keys and persists a hash-chained run record | L3 | `evidence/20261126_m3_supervised/` |
+| Declared branches select deterministically on both engines with exact report parity | L3 | `tests/test_branches.py`; `tests/test_tree_branches.py` |
+| A terminal WAITING_FOR_OPERATOR reports exit 3 and grants no motion authority | L3 | `tests/test_waiting.py` |
+| `--derived-from` verifies the predecessor hash chain and requires a new recipe version, run id and authorization before any gateway call | L3 | `tests/test_derived.py` |
+| The system P0 C2 double-terminal failure is resolved on the mock (C1–C5, stress loop) | L3 | system probe evidence |
 
 ## 3. Not verified
 
 | Item | Reason | Risk |
 |---|---|---|
-| HTTP/WS gateway client | Not implemented (M2) | No live contract, health or safety read exists |
-| Contract and safety checks against a real gateway | No transport | The preflight logic is proven only against typed fakes |
-| Session and lease binding | Not implemented (M3) | A real run cannot acquire or release a system lease |
-| Intent submission to a real gateway | Not implemented (M3) | No command has reached a gateway |
-| Persisted run record and evidence export | Not implemented (M3) | `RunReport` is in memory only |
-| Stop and pre-emption against the system layer | No transport | Only the client-side request path is tested |
-| Any hardware behavior | No L5 session | Nothing is known about real-arm execution |
+| Deployed `armpi_debug_gateway` C1–C5 | Not probed | M4 cannot start until the deployed gateway repeats the contract |
+| Hardware execution | No L5 session | No real-arm or chassis claim |
+| Named/gripper facts | Requires a `jcheng-interfaces` proposal | Gripper-dependent branches cannot be expressed yet |
+| Live operator channel / resumption | Not implemented | WAITING is terminal; resumption is a new authorized run |
+| py_trees promotion | Optional extra; licence review open | Tree engine is not the default |
 | Operator authentication | Owned by `jcheng-studio` | This repository trusts the supplied authorization record |
 
 ## 4. Limitations
 
-- v0.1.0 is an offline library and CLI. It is not used by the running robot.
-- The example recipe is uncalibrated and is not a hardware program. Joint names
-  and target positions are placeholders.
-- The run report is not persisted, signed or exported. It cannot serve as
-  evidence until M3 adds the append-only record.
-- The authorization record is supplied by the caller. This repository has no
-  login, token or operator identity provider; `jcheng-studio` owns that surface.
-- A completion claim always depends on the gateway's `bus_verified` value. The
-  application never reads `/joint_states` and never treats it as a measurement.
-- No motion authority and no e-stop. The platform has no e-stop, brake, encoder
-  or self-collision model; the system layer's stop latch is a software stop.
+- v0.1.0 is an offline/mock application. It is not used by the running robot.
+- The deployed gateway and hardware remain M4; no L5 claim is made.
+- The tree engine is opt-in; the default is the linear engine.
+- A completion claim always depends on the gateway's `bus_verified` value.
+- No motion authority and no e-stop. The system layer's stop latch is a software
+  stop; the platform has no e-stop, brake, encoder or self-collision model.
 - Mock and fake-gateway results are never reported as hardware validation.
-- The reviewer sign-off is pending; this report is not an organization-wide
-  acceptance.
 
 ## 5. Sign-off
 
@@ -77,6 +71,5 @@
 
 ## 6. Machine-readable report
 
-None. When produced, reports must validate against
-`jcheng-interfaces/schemas/acceptance-report.v1.schema.json`. A `RunReport` is
-not an acceptance report and does not replace this document.
+None. Per-run reports, when produced, must validate against
+`jcheng-interfaces/schemas/acceptance-report.v1.schema.json`.
