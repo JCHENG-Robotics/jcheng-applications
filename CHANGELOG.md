@@ -23,6 +23,10 @@ All notable changes to this project are documented here. Format based on
 - `tests/test_tree_runtime.py` and `evidence/20261126_m1_5_tree/`: a 4-case
   differential against the linear engine, rejection/one-stop, deadline/late
   result, and an L3 run against the real system mock gateway (3/3 steps).
+- T-C06 in `tests/test_tree_regression.py`: 12 scripted cases with a fixed
+  clock assert exact `RunReport` equality between the linear and tree engines,
+  including steps, abort reason and stop error. Evidence:
+  `evidence/20261126_t_c06/`.
 - M3 supervised execution on the mock gateway: `write_transport.py` implements
   lease acquire/renew/release, one execute per step and one stop; it refuses a
   gateway whose health does not advertise `mock`. `lease.py` renews at

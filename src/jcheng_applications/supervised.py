@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .core.preflight import PreflightRefusal
 from .gateway import GatewayProtocolError
@@ -49,6 +50,7 @@ def run_supervised(
     require_mock: bool = True,
     engine: str = "linear",
     deadline_s: float | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> SupervisedResult:
     """Acquire a lease, run the recipe, release the lease and persist the report.
 
@@ -92,10 +94,16 @@ def run_supervised(
     info = session.acquire()
     try:
         if tree_run is None:
-            report = TaskRunner(gateway).run(
-                recipe, authorization, run_id=run_id
+            runner = (
+                TaskRunner(gateway)
+                if clock is None
+                else TaskRunner(gateway, clock=clock)
             )
+            report = runner.run(recipe, authorization, run_id=run_id)
         else:
+            tree_kwargs: dict[str, Any] = {"deadline_s": deadline_s}
+            if clock is not None:
+                tree_kwargs["clock"] = clock
             try:
                 report = tree_run(
                     gateway,
@@ -104,14 +112,16 @@ def run_supervised(
                     plan=plan,
                     run_id=run_id,
                     lease_id=info.lease_id,
-                    deadline_s=deadline_s,
+                    **tree_kwargs,
                 )
             except (PreflightRefusal, GatewayProtocolError) as exc:
-                report = aborted_report(
-                    recipe,
-                    authorization,
-                    run_id,
-                    f"{type(exc).__name__}: {exc}",
+                reason = f"{type(exc).__name__}: {exc}"
+                report = (
+                    aborted_report(recipe, authorization, run_id, reason)
+                    if clock is None
+                    else aborted_report(
+                        recipe, authorization, run_id, reason, clock=clock
+                    )
                 )
     finally:
         released = session.release()

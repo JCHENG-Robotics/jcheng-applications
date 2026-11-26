@@ -577,7 +577,7 @@ separate authorization per session.
 | Late future, hung worker and stop race are non-success and latch | M15-E/F/G |
 | Production tree engine with one daemon worker and one in-flight step | `src/jcheng_applications/tree/runtime.py`; `tests/test_tree_runtime.py`; L3 `evidence/20261126_m1_5_tree/` |
 | Independent Run Supervisor: deadline, cancellation, one stop, stop-error capture | `RunSupervisor`; `tests/test_tree_runtime.py`; probe M15-J |
-| Failure-path differential (call log + stop + report semantics) | 4-case tree-runtime differential + 11-case probe differential M15-K; T-C06 behavioural parity passes, full `RunReport` object pending |
+| Failure-path differential (call log + stop + report semantics) | **Verified**: 12-case exact `RunReport` parity (T-C06) + 4-case tree-runtime differential + 11-case probe differential M15-K |
 | No new default dependency; py_trees is an optional `tree` extra | `pyproject.toml`; tree tests skip without it; licence review open |
 | Repository gate and CI `applications-gate` pass | `bash scripts/check_repo_gate.sh`; CI installs the tree extra |
 
@@ -585,9 +585,10 @@ Progress 2026-11-26: the Shared Execution Core is extracted and the opt-in
 production tree engine + Run Supervisor are built. The tree engine passes a
 4-case differential against the linear engine and an L3 run against the real
 system mock gateway (3/3 steps, lease released). The default remains linear;
-py_trees is an optional extra pending licence review. T-C06 compares
-behavioural fields, not the full `RunReport` object. M1.5 is In progress, not
-Complete; it does not prove hardware or physical safety.
+py_trees is an optional extra pending licence review. T-C06 is **verified**:
+12 cases produce an exact `RunReport` match between the linear and tree
+engines. M1.5 is In progress only because the engine is opt-in and the licence
+review is open; it does not prove hardware or physical safety.
 
 ### M2 — read-only gateway client (mainline)
 
@@ -664,7 +665,7 @@ State is `Planned` for every row; this document does not claim a pass.
 | T-C03 | At most one stop request per run, including stop failure | Stop-once | L2 |
 | T-C04 | Exhaustive classification table (outcome × `bus_verified` × scope) | No decision gap | L1 |
 | T-C05 | Golden idempotency keys for v0.1.0 recipes | Key stability for existing plans | L1 |
-| T-C06 | **Shared Core regression**: linear and tree engines share `StepExecutor`/`classify`; the production tree engine matches the linear engine on state and step outcomes in 4 cases, and the probe matches call logs/stops/steps across 11 cases; the existing 89 tests pass unchanged. **Partially verified 2026-11-26**: the full `RunReport` object is not yet compared | The refactor changed no behaviour | L2 |
+| T-C06 | **Shared Core regression**: linear and tree engines share `StepExecutor`/`classify`; `tests/test_tree_regression.py` asserts **exact `RunReport` equality** across 12 scripted cases with a fixed clock; the existing 89 tests pass unchanged. **Verified 2026-11-26** | The refactor changed no behaviour | L2 |
 
 ### 16.3 Differential (tree vs linear)
 

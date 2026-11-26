@@ -80,6 +80,7 @@ jcheng-applications/
 ├── evidence/20261126_m1_5_pytrees/ # M1.5 isolated probe evidence
 ├── evidence/20261126_m3_supervised/# M3 L3 supervised-run evidence
 ├── evidence/20261126_m1_5_tree/    # M1.5 tree engine L3 evidence
+├── evidence/20261126_t_c06/        # T-C06 full RunReport parity evidence
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -156,8 +157,8 @@ executes motion itself.
 | A rejected, aborted, timed-out or unverified step stops the run and is never retried | Verified (L2, 2026-11-26) | `tests/test_runner.py` |
 | No hardware, DDS or motion-execution path exists; network access is confined to `transport.py` and `write_transport.py`, and the write path refuses non-mock gateways | Verified (L0, 2026-11-26) | `tests/test_no_hardware.py`; `tests/test_supervised.py` |
 | Read-only gateway admission: four GET reads, bounded timeouts, no retry, contract/auth/format refusal | Verified (L2, 2026-11-26) | `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
-| Shared Execution Core; linear and tree drivers use the same classifier | Partially verified (L2, 2026-11-26) | `tests/test_core.py`; M1.5 M15-K 11-case differential; `evidence/20261126_shared_core/`; full `RunReport` parity pending |
-| Opt-in py_trees engine + independent deadline/cancel/stop supervisor | Partially verified (L2/L3, 2026-11-26) | `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/`; py_trees extra not default; licence review open |
+| Shared Execution Core; linear and tree engines | Verified (L2, 2026-11-26) | `tests/test_core.py`; T-C06 12-case exact `RunReport` parity; `evidence/20261126_shared_core/`, `evidence/20261126_t_c06/` |
+| Opt-in py_trees engine + independent deadline/cancel/stop supervisor | Verified (L2/L3, 2026-11-26) | `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/`; py_trees extra not default; licence review open |
 | Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
 | Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
 | Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |

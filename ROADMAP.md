@@ -33,7 +33,7 @@
 |---|---|---|---|---|
 | M0 | Repository scaffold and admission manifest | Complete (2026-11-26) | The document set, gate and CI `applications-gate` pass; the manifest claims no runtime surface | `evidence/20261126_scaffold/` |
 | M1 | Offline orchestration core | Complete (2026-11-26) | Recipes validate against the v0.1.0 contract; plans are deterministic; the runner refuses bad authorization, contract, safety and lease preconditions and never retries an indeterminate step; no transport exists | `src/jcheng_applications/`; `tests/test_recipe.py`, `tests/test_gateway.py`, `tests/test_runner.py` |
-| M1.5 | Isolated task-engine technical validation (parallel, does not gate M2) | In progress (local, 2026-11-26) | The Shared Execution Core is extracted and both drivers call it. The opt-in py_trees engine and independent Run Supervisor are built: one in-flight step, deadline/cancel/one-stop, L3 tree run, and an 11-case failure differential. The default remains linear; py_trees is an optional `tree` extra with the licence review open. T-C06 behavioural parity passes; full report-object parity is pending | `src/jcheng_applications/tree/`; `tests/test_tree_runtime.py`; `evidence/20261126_m1_5_tree/`; `docs/M1_5_VALIDATION.md` |
+| M1.5 | Isolated task-engine technical validation (parallel, does not gate M2) | In progress (local, 2026-11-26) | The Shared Execution Core is extracted and both drivers call it. The opt-in py_trees engine and independent Run Supervisor are built: one in-flight step, deadline/cancel/one-stop, L3 tree run, and an 11-case failure differential. The default remains linear; py_trees is an optional `tree` extra with the licence review open. T-C06 is verified: 12 cases produce an exact `RunReport` match | `src/jcheng_applications/tree/`; `tests/test_tree_runtime.py`; `tests/test_tree_regression.py`; `evidence/20261126_m1_5_tree/`; `evidence/20261126_t_c06/`; `docs/M1_5_VALIDATION.md` |
 | M2 | Read-only gateway client and admission | Complete (2026-11-26) | The client implements `GET /v1/health`, `/v1/contract`, `/v1/state` and `/v1/safety` with bounded timeouts, GET-only behavior, no retry and no fallback; contract-mismatch and unreachable refusal are tested against a loopback mock. CI `applications-gate` passed | `src/jcheng_applications/transport.py`; `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | M3 | Supervised execution of one recipe | Complete, mock/L3 (2026-11-26) | A session-bound run acquires and releases the system lease, submits one recipe with stable idempotency keys, honours stop and pre-emption, and produces a persisted hash-chained run report; proven against the real `jcheng-system` gateway process with `MockStack` (L3), no robot. The deployed gateway still needs C1–C5 before M4, and `JOINT_STEP` is single-joint in the system profile | `src/jcheng_applications/write_transport.py`, `lease.py`, `runstore.py`, `supervised.py`; `evidence/20261126_m3_supervised/` |
 | S3 | Declared branches and strategy selection (parallel after M3) | Planned | A recipe with declared facts and branches validates; branch scopes join the authorization union; the selector is three-valued, deterministic and cannot read execution outcomes; a required branch with no candidate enters `WAITING_FOR_OPERATOR`; a Derived Plan needs a new version, run id and authorization; proven against a mock gateway (L2), no robot | — |
@@ -56,9 +56,9 @@ the mock without any workaround.
 ## Next
 
 1. **M1.5 — tree engine promotion.** The opt-in tree engine and supervisor
-   are built and L3-tested. Before making `tree` the default: close the
-   py_trees/pydot licence review, extend T-C06 to the full `RunReport` object,
-   and keep the 11-case call-log matrix green.
+   are built, L3-tested and T-C06-verified (12-case exact `RunReport` parity).
+   Before making `tree` the default: close the py_trees/pydot licence review
+   and keep the parity matrix green.
 2. **M3 residuals.** The mock/L3 path is complete. Before M4: document the
    single-joint `JOINT_STEP` constraint in `RECIPES.md`, obtain R5
    (`StopResult` confirmation levels), and run C1–C5 on the deployed

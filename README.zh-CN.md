@@ -72,6 +72,7 @@ jcheng-applications/
 ├── evidence/20261126_m1_5_pytrees/ # M1.5 隔离探针证据
 ├── evidence/20261126_m3_supervised/# M3 L3 受监督运行证据
 ├── evidence/20261126_m1_5_tree/    # M1.5 树引擎 L3 证据
+├── evidence/20261126_t_c06/        # T-C06 完整 RunReport 对齐证据
 ├── VERSION
 ├── README.md / README.zh-CN.md
 ├── ROADMAP.md / CHANGELOG.md / ACCEPTANCE.md
@@ -142,8 +143,8 @@ DDS，也不自行执行运动。
 | 被拒绝、中止、超时或未实测的步骤会停止运行，且绝不重试 | 已验证（L2，2026-11-26） | `tests/test_runner.py` |
 | 仓库中不存在硬件、DDS 或运动执行路径；网络访问只允许 `transport.py` 与 `write_transport.py`，且写路径拒绝非 mock 网关 | 已验证（L0，2026-11-26） | `tests/test_no_hardware.py`；`tests/test_supervised.py` |
 | 只读网关准入：四项 GET、有界超时、不重试、拒绝契约/鉴权/格式错误 | 已验证（L2，2026-11-26） | `tests/test_transport.py`；`evidence/20261126_m2_transport/`；[CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
-| Shared Execution Core；线性与树驱动共用同一分类器 | 部分验证（L2，2026-11-26） | `tests/test_core.py`；M1.5 M15-K 11 例差分；`evidence/20261126_shared_core/`；完整 `RunReport` 对齐待补 |
-| 可选 py_trees 引擎 + 独立 deadline/cancel/stop 监督器 | 部分验证（L2/L3，2026-11-26） | `tests/test_tree_runtime.py`；`evidence/20261126_m1_5_tree/`；py_trees 非默认；许可证审查未关闭 |
+| Shared Execution Core；线性与树引擎 | 已验证（L2，2026-11-26） | `tests/test_core.py`；T-C06 12 例完整 `RunReport` 对齐；`evidence/20261126_shared_core/`、`evidence/20261126_t_c06/` |
+| 可选 py_trees 引擎 + 独立 deadline/cancel/stop 监督器 | 已验证（L2/L3，2026-11-26） | `tests/test_tree_runtime.py`；`evidence/20261126_m1_5_tree/`；py_trees 非默认；许可证审查未关闭 |
 | 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
 | 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
 | 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |
