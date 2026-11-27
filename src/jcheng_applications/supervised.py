@@ -64,8 +64,12 @@ def run_supervised(
     the run is refused or indeterminate.
     """
 
-    if evidence_class not in {"L2", "L3"}:
-        raise ValueError("evidence_class must be L2 or L3")
+    if evidence_class not in {"L2", "L3", "L5"}:
+        raise ValueError("evidence_class must be L2, L3 or L5")
+    if require_mock and evidence_class == "L5":
+        raise ValueError("L5 evidence requires a hardware target")
+    if not require_mock and evidence_class != "L5":
+        raise ValueError("a hardware target requires L5 evidence")
     if engine not in {"linear", "tree"}:
         raise ValueError("engine must be 'linear' or 'tree'")
     if deadline_s is not None and engine != "tree":
@@ -95,6 +99,8 @@ def run_supervised(
 
     if require_mock:
         gateway.check_mock()
+    else:
+        gateway.check_hardware()
 
     plan = build_plan(recipe, run_id)
     session = LeaseSession(

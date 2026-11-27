@@ -47,7 +47,7 @@ is no second path: no SSH, no vendor SDK, no ROS topic, no serial device.
 | State | `GET /v1/state` returns `truth` (`measured` or `commanded`), `verification`, `fresh`, `profile_hash` and `header.stamp`. A `commanded` snapshot is never treated as measurement |
 | Lease | `POST /v1/leases` acquires a client reference, `POST /v1/leases/{id}/renew` renews at `ttl/3`, `DELETE /v1/leases/{id}` releases. The system layer owns the lease and may revoke it |
 | Intent validation | `POST /v1/motion/validate` for a dry validation when M2 needs it |
-| Intent submission | `POST /v1/motion/execute` with the `Idempotency-Key` header; the gateway and system layer perform the motion. M3 refuses a gateway without the `mock` capability |
+| Intent submission | `POST /v1/motion/execute` with the `Idempotency-Key` header; the gateway and system layer perform the motion. `--target mock` refuses a gateway without `mock`; `--target hardware` requires `--evidence-class L5` and a gateway advertising `hardware` |
 | Stop | `POST /v1/motion/stop` after a failed or indeterminate submission; the response is parsed into a `StopReceipt`. A legacy response is S1 only; S2 requires `confirmation: backend_confirmed`; `physical_stop` is always `unverified` |
 | Events | `GET /v1/events` and the WebSocket envelope for state, safety, lease and motion events |
 | Ports | Deployment detail, not contract; the adapter reads the configured URL and assumes nothing |
@@ -108,6 +108,8 @@ flight when the supervisor halts becomes `UNKNOWN` and the run is
 | Condition | Required behavior |
 |---|---|
 | Gateway does not advertise `mock` | Refused before a lease or submission; `run` exits non-zero |
+| `--target hardware` without `--evidence-class L5`, or `L5` without the hardware target | Refused before `load_recipe`/any gateway call; exit 2 |
+| `--target hardware` and the gateway does not advertise `hardware` | Refused before a lease or submission; exit 2 |
 | Lease acquisition fails | `run` exits non-zero; nothing submitted |
 | Lease renewal fails during the run | One stop; later submissions are blocked; the run cannot succeed |
 | Gateway unreachable at preflight | `ABORTED`; nothing submitted; no retry loop |
@@ -159,7 +161,8 @@ operator runbook.
 | Stop confirmation receipt | Optional R5 fields parsed on both engines (L1–L3, 2026-11-26): absent → S1, explicit `backend_confirmed` → S2, `physical_stop` only `unverified`, stop failure → no level. The real system mock gateway (legacy response) records S1 only. Evidence: `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` |
 | Run-record audit | `verify` checks the hash chain and terminal entry, prints state/steps/stop levels, makes no network call and does not create the store (L1, 2026-11-26). Evidence: `tests/test_audit.py`; `evidence/20261126_record_audit/` |
 | M1.5 tree engine | Opt-in `--engine tree` against the same system mock gateway (L3, 2026-11-26): 3/3 steps, lease released; L2 deadline/rejection/one-stop tests. Evidence: `evidence/20261126_m1_5_tree/` |
-| M4 supervised hardware | separately authorized L5 session with system limits and stop latch active |
+| M4 target gate | `--target hardware` + `--evidence-class L5` + gateway `hardware` capability, tested offline (L1, 2026-11-27); nothing submitted against a mock-only gateway; evidence: `evidence/20261127_m4_target/` |
+| M4 supervised hardware | separately authorized L5 session with system limits and stop latch active; not run |
 
 No hardware claim is valid before M4. Synthetic, mock and replay results are
 never reported as hardware validation.

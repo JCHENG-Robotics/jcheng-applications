@@ -141,6 +141,16 @@ jcheng-applications run path/to/m3-recipe.yaml \
   --store-dir ~/.local/state/jcheng-applications/runs \
   --evidence-class L3
 
+# M4 hardware target: this example grants no authorization. The operator must
+# supply a separate per-session record and the gateway must advertise hardware.
+jcheng-applications run path/to/m4-recipe.yaml \
+  --authorization /path/to/authorization.json \
+  --run-id demo-004 \
+  --target hardware \
+  --evidence-class L5 \
+  --url http://<gateway-host>:8766 \
+  --store-dir ~/.local/state/jcheng-applications/runs
+
 # Audit one stored record: read-only, no network. Exit 0 means the chain
 # verifies and the run has a terminal entry, not that the run succeeded.
 jcheng-applications verify demo-002 \
@@ -180,6 +190,7 @@ authorization session; a violation refuses before any gateway call.
 | Derived Plan identity: verified predecessor, new recipe version, run id and authorization session before any gateway call | Verified (L1/L2, 2026-11-26) | `tests/test_derived.py`; `evidence/20261126_derived_plan/` |
 | Supervised execution against the mock gateway: lease acquire/release, 3-step recipe, stop-on-rejection, record | Verified (L3, 2026-11-26) | `evidence/20261126_m3_supervised/`; real `jcheng-system` gateway process + `MockStack`; no robot |
 | Stop confirmation levels: legacy response is S1 only, S2 requires `backend_confirmed`, physical stop is always `unverified` | Verified (L1–L3, 2026-11-26) | `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` (real system mock gateway, legacy S1); R5 schema review pending |
+| M4 target gate: hardware requires L5 + a gateway advertising `hardware`; mock/L5 mismatch refused before lease | Verified (L1, 2026-11-27) | `tests/test_m4_target.py`; `evidence/20261127_m4_target/`; no hardware run |
 | Persisted, hash-chained run records outside the repository | Verified (L2/L3, 2026-11-26) | `tests/test_supervised.py`; `evidence/20261126_m3_supervised/verify.txt` |
 | Read-only record audit: chain, terminal entry, stop levels; missing/tampered/incomplete exit non-zero | Verified (L0/L1, 2026-11-26) | `tests/test_audit.py`; `evidence/20261126_record_audit/` |
 | Intent submission to a real robot gateway | Unverified | M4 requires a separate authorized session and C1–C5 on the deployed gateway |

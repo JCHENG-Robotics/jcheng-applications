@@ -39,7 +39,8 @@
 | M2 | Read-only gateway client and admission | Complete (2026-11-26) | The client implements `GET /v1/health`, `/v1/contract`, `/v1/state` and `/v1/safety` with bounded timeouts, GET-only behavior, no retry and no fallback; contract-mismatch and unreachable refusal are tested against a loopback mock. CI `applications-gate` passed | `src/jcheng_applications/transport.py`; `tests/test_transport.py`; `evidence/20261126_m2_transport/`; [CI run 45748905495](https://github.com/JCHENG-Robotics/jcheng-applications/actions/runs/45748905495) |
 | M3 | Supervised execution of one recipe | Complete, mock/L3 (2026-11-26) | A session-bound run acquires and releases the system lease, submits one recipe with stable idempotency keys, honours stop and pre-emption, records S1/S2 stop confirmation when the gateway sends the optional R5 fields, produces a persisted hash-chained run report and a read-only `verify` audit; proven against the real `jcheng-system` gateway process with `MockStack` (L3), no robot. The deployed gateway still needs C1–C5 before M4, and `JOINT_STEP` is single-joint in the system profile | `src/jcheng_applications/write_transport.py`, `lease.py`, `runstore.py`, `supervised.py`; `evidence/20261126_m3_supervised/`; `tests/test_stop_confirmation.py` |
 | S3 | Declared branches and strategy selection (parallel after M3) | In progress: v0 on linear and tree engines (2026-11-26) | A recipe with declared facts and branches validates; branch scopes join the authorization union; the selector is three-valued, deterministic and never reads execution outcomes; an optional branch continues and a required branch with no candidate is `ABORTED` + one stop; positional arm facts are verified L3 against the mock gateway; the tree engine executes the same branch plan with exact report parity; `operator_required`/CLI exit 3 marks a terminal `WAITING_FOR_OPERATOR` with no motion authority; `--derived-from` enforces a verified predecessor, a new recipe version, run id and authorization session before any gateway call. Named/gripper facts and a live operator channel remain open | `tests/test_branches.py`; `tests/test_tree_branches.py`; `tests/test_waiting.py`; `tests/test_derived.py`; `recipes/example-declared-branch.yaml`; `evidence/20261126_s3_branches/`; `evidence/20261126_s3_tree/`; `evidence/20261126_waiting/`; `evidence/20261126_derived_plan/` |
-| M4 | Supervised hardware acceptance | Planned | Every motion session is separately authorized; the system layer applies the lease, limits and stop latch; L5 evidence is recorded alongside the system layer's own | — |
+| M4 | Supervised hardware acceptance | In progress: target gate implemented (2026-11-27), hardware not run | Every motion session is separately authorized; the system layer applies the lease, limits and stop latch; L5 evidence is recorded alongside the system layer's own; `--target hardware` + L5 + hardware capability are mandatory | `tests/test_m4_target.py`; `evidence/20261127_m4_target/`; hardware — |
+
 
 ### P0 resolution (2026-11-26)
 
@@ -48,12 +49,14 @@ The original `jcheng-system` probe failed C2 (two terminal results, a late
 a 30-iteration stop/execute stress loop with zero double terminals. Evidence:
 `jcheng-system/e2e/reports/20261126_concurrency_probe_r2/`; revision record:
 `jcheng-system/docs/EXECUTION-MODEL-REVISION.md`. **M3 is unblocked on the
-mock.** Two things remain outside this repository: R5 (`StopResult`
-confirmation levels) needs a `jcheng-interfaces` review, and the deployed
-`armpi_debug_gateway` must repeat C1–C5 before M4. There is still no
-application-layer workaround: the app must not suppress a late `COMPLETED`,
-rewrite an outcome or retry around a stop race. M3 now exercises this path on
-the mock without any workaround.
+mock.** R5 (`StopResult` confirmation levels) is merged as a proposal but its
+schema/system implementation is pending. The M4/M5 target is the
+`jcheng_system_core` gateway with the M5.2 `jcheng_vendor` executor (R10
+hardware node, Humble-built); the frozen `armpi_debug_gateway` is legacy and
+not the target. C1–C5 on the chosen target and hardware authorization remain.
+There is still no application-layer workaround: the app must not suppress a
+late `COMPLETED`, rewrite an outcome or retry around a stop race. M3 now
+exercises this path on the mock without any workaround.
 
 ## Next
 
@@ -61,16 +64,18 @@ the mock without any workaround.
    are built, L3-tested and T-C06-verified (12-case exact `RunReport` parity).
    Before making `tree` the default: close the py_trees/pydot licence review
    and keep the parity matrix green.
-2. **M3 residuals.** The mock/L3 path is complete. Before M4: document the
-   single-joint `JOINT_STEP` constraint in `RECIPES.md`, obtain R5
-   (`StopResult` confirmation levels), and run C1–C5 on the deployed
-   `armpi_debug_gateway`.
+2. **M3 residuals.** The mock/L3 path is complete; the single-joint
+   `JOINT_STEP` constraint is documented in `RECIPES.md`. R5 is a merged
+   proposal awaiting schema/system implementation. Run C1–C5 on the chosen
+   system gateway hardware node before any M4 motion.
 3. **S3 residuals.** v0 runs on both engines; `WAITING_FOR_OPERATOR` is a
    terminal operator-required state; Derived Plan identity is enforced.
    Remaining: a live operator channel and named/gripper facts after the
    `jcheng-interfaces` schema review.
-4. **M4 — supervised hardware acceptance.** One separately authorized session
-   with the system layer's lease, limits and stop latch; L5 evidence.
+4. **M4 — supervised hardware acceptance.** The target gate is implemented:
+   `--target hardware` requires L5 and a gateway advertising `hardware`, and a
+   mismatch is refused before the lease. Remaining: one separately authorized
+   session with the system layer's lease, limits and stop latch; L5 evidence.
 
 ## Out of scope
 

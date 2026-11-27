@@ -16,8 +16,8 @@
 | Gate | Command | Level | Result | Evidence |
 |---|---|---|---|---|
 | Repository gate | `bash scripts/check_repo_gate.sh` | L0 | pass | local, 2026-11-26 |
-| Unit tests (with tree extra) | `python3 -m pytest -q` | L1 | pass (204 tests) | `tests/` |
-| Unit tests (default extras) | `python3 -m pytest -q` | L1 | pass (182 passed, 5 skipped) | `tests/` |
+| Unit tests (with tree extra) | `python3 -m pytest -q` | L1 | pass (208 tests) | `tests/` |
+| Unit tests (default extras) | `python3 -m pytest -q` | L1 | pass (186 passed, 5 skipped) | `tests/` |
 | Offline runner against a fake gateway | `pytest -q tests/test_runner.py` | L2 | pass | `tests/test_runner.py` |
 | M2 read-only transport | loopback mock gateway | L2 | pass (GET only, no retry, contract mismatch refusal) | `evidence/20261126_m2_transport/` |
 | M3 supervised run | real `jcheng-system` mock gateway + `MockStack` | L3 | pass (lease, idempotency, persisted hash-chained record) | `evidence/20261126_m3_supervised/` |
@@ -27,6 +27,7 @@
 | Derived-plan guard | verified predecessor before any gateway call | L3 | pass (zero-request refusal) | `evidence/20261126_derived_plan/` |
 | Stop confirmation receipt | both engines; legacy/S1, explicit S2, failure, no stop | L1–L3 | pass (16 tests, 2 tree-only; L3 legacy S1 on the real system mock gateway) | `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` |
 | Run-record audit | complete, stop levels, tampered, unparseable, incomplete, missing, unsafe id | L1 | pass (7 tests; read-only, no store creation) | `tests/test_audit.py`; `evidence/20261126_record_audit/` |
+| M4 target gate | hardware needs L5 + hardware capability; mock/L5 mismatch; zero submissions on refusal | L1 | pass (4 tests) | `tests/test_m4_target.py`; `evidence/20261127_m4_target/` |
 | P0 C1–C5 (system dependency) | `jcheng-system` concurrency probe | L3 | pass (zero double terminals) | `jcheng-system/e2e/reports/20261126_concurrency_probe_r2/` |
 | Hardware | — | L5 | not run | — |
 
@@ -46,6 +47,7 @@
 | The system P0 C2 double-terminal failure is resolved on the mock (C1–C5, stress loop) | L3 | system probe evidence |
 | A legacy stop response records S1 only; S2 requires `backend_confirmed`; `physical_stop` is only `unverified`; a failed stop records no level | L1–L3 | `tests/test_stop_confirmation.py`; `evidence/20261126_stop_confirmation/` (real system mock gateway) |
 | `verify` audits a run record read-only: chain, terminal entry, stop levels; missing/tampered/incomplete exit 1; no network or store creation | L1 | `tests/test_audit.py`; `evidence/20261126_record_audit/` |
+| A hardware run requires `--target hardware`, L5 and a gateway advertising `hardware`; mismatches are refused before the lease or any submission | L1 | `tests/test_m4_target.py`; `evidence/20261127_m4_target/` |
 
 ## 3. Not verified
 

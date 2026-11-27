@@ -49,6 +49,10 @@ class NonMockGateway(GatewayError):
     """The gateway does not advertise the mock capability; M3 refuses it."""
 
 
+class NonHardwareGateway(GatewayError):
+    """The gateway does not advertise the hardware capability; M4 refuses it."""
+
+
 @dataclass(frozen=True)
 class LeaseInfo:
     lease_id: str
@@ -91,6 +95,16 @@ class HttpGateway:
             raise NonMockGateway(
                 "gateway does not advertise the mock capability; "
                 "M3 refuses to submit motion"
+            )
+
+    def check_hardware(self) -> None:
+        """Refuse a gateway that does not advertise hardware; M4 is opt-in."""
+
+        health = self.health()
+        if "hardware" not in health.capabilities:
+            raise NonHardwareGateway(
+                "gateway does not advertise the hardware capability; "
+                "the M4 target must be the hardware-backed system gateway"
             )
 
     # ---- lease ----

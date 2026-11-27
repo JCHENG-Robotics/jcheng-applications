@@ -128,6 +128,16 @@ jcheng-applications run path/to/m3-recipe.yaml \
   --store-dir ~/.local/state/jcheng-applications/runs \
   --evidence-class L3
 
+# M4 硬件目标：此示例不构成任何授权。操作员必须提供单独的逐会话记录，
+# 且网关必须声明 hardware 能力。
+jcheng-applications run path/to/m4-recipe.yaml \
+  --authorization /path/to/authorization.json \
+  --run-id demo-004 \
+  --target hardware \
+  --evidence-class L5 \
+  --url http://<gateway-host>:8766 \
+  --store-dir ~/.local/state/jcheng-applications/runs
+
 # 审计单条运行记录：只读、不联网。退出码 0 表示哈希链有效且存在终态记录，
 # 不表示该次运行成功。
 jcheng-applications verify demo-002 \
@@ -164,6 +174,7 @@ DDS，也不自行执行运动。退出码：0 `SUCCEEDED`，1 `FAILED`/`ABORTED
 | Derived Plan 身份：前序记录校验、新 recipe 版本、新 run id、新授权会话，且在任何网关调用前拒绝 | 已验证（L1/L2，2026-11-26） | `tests/test_derived.py`；`evidence/20261126_derived_plan/` |
 | 面向 mock 网关的受监督执行：租约获取/释放、3 步配方、拒绝即停、记录 | 已验证（L3，2026-11-26） | `evidence/20261126_m3_supervised/`；真实 `jcheng-system` 网关进程 + `MockStack`；无机器人 |
 | 停止确认等级：旧响应仅为 S1；S2 必须由 `backend_confirmed` 明确确认；物理停止恒为 `unverified` | 已验证（L1–L3，2026-11-26） | `tests/test_stop_confirmation.py`；`evidence/20261126_stop_confirmation/`（真实系统 mock 网关，旧响应 S1）；R5 schema 评审待完成 |
+| M4 目标门禁：hardware 必须同时有 L5 和声明 `hardware` 的网关；mock/L5 不匹配在租约前拒绝 | 已验证（L1，2026-11-27） | `tests/test_m4_target.py`；`evidence/20261127_m4_target/`；未实机 |
 | 仓库外持久化、哈希链运行记录 | 已验证（L2/L3，2026-11-26） | `tests/test_supervised.py`；`evidence/20261126_m3_supervised/verify.txt` |
 | 只读记录审计：哈希链、终态记录、停止等级；缺失/篡改/未完成均非零退出 | 已验证（L0/L1，2026-11-26） | `tests/test_audit.py`；`evidence/20261126_record_audit/` |
 | 向真实机器人网关提交意图 | 未验证 | M4 需要单独授权会话与部署网关上的 C1–C5 |

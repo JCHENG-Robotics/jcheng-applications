@@ -71,7 +71,10 @@ def _parser() -> argparse.ArgumentParser:
 
     run = subparsers.add_parser(
         "run",
-        help="supervised execution against a mock gateway; submits motion",
+        help=(
+            "supervised execution against a gateway; mock by default, "
+            "hardware only with --target hardware --evidence-class L5"
+        ),
     )
     run.add_argument("recipe", type=Path)
     run.add_argument(
@@ -94,7 +97,13 @@ def _parser() -> argparse.ArgumentParser:
         help="append-only run records; must be outside the repository",
     )
     run.add_argument(
-        "--evidence-class", choices=["L2", "L3"], default="L2"
+        "--target",
+        choices=["mock", "hardware"],
+        default="mock",
+        help="hardware requires --evidence-class L5 and a hardware gateway",
+    )
+    run.add_argument(
+        "--evidence-class", choices=["L2", "L3", "L5"], default="L2"
     )
     run.add_argument(
         "--derived-from",
@@ -167,6 +176,18 @@ def _run(args: argparse.Namespace) -> int:
     if store_dir == repo_root or repo_root in store_dir.parents:
         print("error: --store-dir must be outside the repository", file=sys.stderr)
         return 2
+    if args.target == "hardware" and args.evidence_class != "L5":
+        print(
+            "error: --target hardware requires --evidence-class L5",
+            file=sys.stderr,
+        )
+        return 2
+    if args.target == "mock" and args.evidence_class == "L5":
+        print(
+            "error: --evidence-class L5 requires --target hardware",
+            file=sys.stderr,
+        )
+        return 2
 
     recipe = load_recipe(args.recipe)
     authorization = authorization_from_mapping(
@@ -185,6 +206,7 @@ def _run(args: argparse.Namespace) -> int:
         recipe_hash=hashlib.sha256(args.recipe.read_bytes()).hexdigest(),
         ttl_ms=args.ttl_ms,
         evidence_class=args.evidence_class,
+        require_mock=args.target == "mock",
         engine=args.engine,
         deadline_s=args.deadline_s,
         derived_from=args.derived_from,
@@ -193,6 +215,7 @@ def _run(args: argparse.Namespace) -> int:
         json.dumps(
             {
                 "run_id": result.report.run_id,
+                "target": args.target,
                 "derived_from": result.derived_from,
                 "state": result.report.state.value,
                 "operator_required": result.report.operator_required,
