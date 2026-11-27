@@ -23,7 +23,7 @@ def contract_payload() -> dict[str, Any]:
     return {
         "contract": {
             "major": 0,
-            "minor": 1,
+            "minor": 2,
             "patch": 0,
             "contract_hash": CONTRACT_HASH,
         },
