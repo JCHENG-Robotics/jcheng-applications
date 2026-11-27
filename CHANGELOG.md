@@ -8,6 +8,12 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- M4 target gate: `run --target hardware` requires `--evidence-class L5` and a
+  gateway advertising `hardware`; `--target mock` rejects L5. A mismatch is
+  refused before `load_recipe`, the lease or any submission. The output records
+  `target`; hardware runs persist `evidence_class: L5`.
+- `HttpGateway.check_hardware` and `NonHardwareGateway`;
+  `tests/test_m4_target.py` and `evidence/20261127_m4_target/`.
 - Stop confirmation receipt (client-side, forward-compatible with the open R5
   contract proposal): `HttpGateway.stop` returns a `StopReceipt`. Missing R5
   fields are S1 `request_accepted`; S2 is recorded only for an explicit

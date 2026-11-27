@@ -695,7 +695,8 @@ facts and a live `WAITING_FOR_OPERATOR` remain open.
 
 | Exit criterion | Evidence |
 |---|---|
-| Probes C1–C5 pass on the deployed gateway | L5; system-owned evidence linked |
+| M4 target guard: `--target hardware` and `--evidence-class L5` are both required; the gateway must advertise `hardware`; a mock/L5 mismatch is refused before the lease | **Verified L1**: `tests/test_m4_target.py`; `evidence/20261127_m4_target/` |
+| Probes C1–C5 pass on the chosen system gateway (R10 hardware node); the frozen legacy gateway is not the target | L5; system-owned evidence linked |
 | One supervised task without Navigate or perception closed loop | L5 |
 | Stop during a real motion is demonstrated in a dedicated dry-run first | L5 |
 | The run record carries `evidence_class: L5`; the mock label is never reused | L5 |
@@ -881,6 +882,7 @@ result.
 - [`../evidence/20261126_derived_plan/`](../evidence/20261126_derived_plan/README.md) — Derived Plan identity guard evidence.
 - [`../evidence/20261126_stop_confirmation/`](../evidence/20261126_stop_confirmation/README.md) — S1/S2 stop-receipt evidence (client-side; R5 schema pending).
 - [`../evidence/20261126_record_audit/`](../evidence/20261126_record_audit/README.md) — read-only run-record audit evidence.
+- [`../evidence/20261127_m4_target/`](../evidence/20261127_m4_target/README.md) — M4 hardware target guard evidence (no hardware).
 - [`../ROADMAP.md`](../ROADMAP.md) — M1.5, M2, M3 ordering.
 - [`../ACCEPTANCE.md`](../ACCEPTANCE.md) — v0.1.0 evidence; no task-engine claim.
 - [`../LICENSE-REVIEW.md`](../LICENSE-REVIEW.md) — planned `py_trees` dependency.
