@@ -17,7 +17,7 @@ from jcheng_applications.model import CONTRACT_HASH
 CONTRACT = {
     "contract": {
         "major": 0,
-        "minor": 1,
+        "minor": 2,
         "patch": 0,
         "contract_hash": CONTRACT_HASH,
     },
@@ -46,7 +46,7 @@ def test_contract_parses() -> None:
     info = contract_from_mapping(CONTRACT)
     assert info == ContractInfo(
         major=0,
-        minor=1,
+        minor=2,
         patch=0,
         contract_hash=CONTRACT_HASH,
         profile_hash=CONTRACT["profile_hash"],
@@ -76,10 +76,10 @@ def test_contract_rejects_invalid_payloads(mutate, message) -> None:
 
 
 def test_contract_range_requires_the_pinned_identity() -> None:
-    base = dict(major=0, minor=1, patch=0, contract_hash=CONTRACT_HASH,
+    base = dict(major=0, minor=2, patch=0, contract_hash=CONTRACT_HASH,
                 profile_hash="p", system_version="s")
     assert contract_in_range(ContractInfo(**base))
-    assert not contract_in_range(ContractInfo(**{**base, "minor": 2}))
+    assert not contract_in_range(ContractInfo(**{**base, "minor": 3}))
     assert not contract_in_range(
         ContractInfo(**{**base, "contract_hash": "sha256:" + "0" * 64})
     )

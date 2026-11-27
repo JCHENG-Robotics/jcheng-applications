@@ -69,7 +69,7 @@ def authorization(**overrides) -> Authorization:
 def contract(**overrides) -> ContractInfo:
     values = {
         "major": 0,
-        "minor": 1,
+        "minor": 2,
         "patch": 0,
         "contract_hash": CONTRACT_HASH,
         "profile_hash": "sha256:" + "b" * 64,
@@ -189,7 +189,7 @@ def test_command_is_a_contract_shaped_request() -> None:
     assert first["profile"] == "step"
     assert first["contract"] == {
         "major": 0,
-        "minor": 1,
+        "minor": 2,
         "patch": 0,
         "contract_hash": CONTRACT_HASH,
     }
@@ -250,7 +250,7 @@ def test_contract_mismatch_refuses_before_any_call() -> None:
 
 
 def test_contract_outside_the_range_refuses() -> None:
-    gateway = FakeGateway(contract_value=contract(minor=2))
+    gateway = FakeGateway(contract_value=contract(minor=3))
     report = run(gateway)
     assert report.state is RunState.ABORTED
     assert gateway.calls == []

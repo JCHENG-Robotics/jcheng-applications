@@ -40,7 +40,7 @@ def _auth(scopes=("arm", "gripper")) -> Authorization:
 def _contract() -> ContractInfo:
     return ContractInfo(
         major=0,
-        minor=1,
+        minor=2,
         patch=0,
         contract_hash=CONTRACT_HASH,
         profile_hash="profile-waiting",

@@ -19,7 +19,7 @@ import math
 import re
 from typing import Any, Mapping, Protocol
 
-from .model import CONTRACT_HASH, MOTION_OUTCOMES, SAFETY_STATES
+from .model import CONTRACT_HASH, CONTRACT_VERSION, MOTION_OUTCOMES, SAFETY_STATES
 
 _HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -310,10 +310,10 @@ def stop_receipt_from_mapping(payload: Any) -> StopReceipt:
 
 
 def contract_in_range(info: ContractInfo) -> bool:
-    """Return whether the contract lies in ``>=0.1,<0.2`` and matches the pin."""
+    """Return whether the contract lies in ``>=0.2,<0.3`` and matches the pin."""
 
     return (
         info.major == 0
-        and info.minor == 1
+        and info.minor == CONTRACT_VERSION["minor"]
         and info.contract_hash == CONTRACT_HASH
     )

@@ -25,7 +25,7 @@ optional (format 0.2):
 | `name` | string | `^[a-z0-9][a-z0-9-]{0,63}$` |
 | `version` | string | `MAJOR.MINOR.PATCH`; recipe-local, independent of the repository version |
 | `description` | string | non-empty; state the intent and any calibration dependency |
-| `contract_hash` | string | must equal the pinned v0.1.0 contract hash |
+| `contract_hash` | string | must equal the pinned v0.2.0 contract hash |
 | `scopes` | list | non-empty subset of `arm`, `gripper`, `base`, `full`; must equal the union of **main and branch** step scopes; `full` cannot be combined |
 | `steps` | list | 1 to 64 main steps; names unique across main and branches |
 | `facts` | mapping | optional; named measured-position facts (see §4.1) |

@@ -36,7 +36,7 @@ def _contract_payload(*, contract_hash: str = CONTRACT_HASH) -> dict[str, Any]:
     return {
         "contract": {
             "major": 0,
-            "minor": 1,
+            "minor": 2,
             "patch": 0,
             "contract_hash": contract_hash,
         },
