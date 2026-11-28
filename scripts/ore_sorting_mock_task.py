@@ -445,6 +445,7 @@ def run_case(
         "expected_status": EXPECTED_STATUS[case],
         "scenario_id": scenario.scenario_id,
         "scenario_version": scenario.scenario_version,
+        "evaluation_id": scenario.evaluation_id,
         "cell_roles": sorted(devices),
         "observation": observation,
         "artifacts": _artifact_hashes(devices, scenario),
@@ -565,6 +566,7 @@ def _sample(result: Mapping[str, Any]) -> dict[str, Any]:
         "task_id": TASK_ID,
         "scenario_id": result["scenario_id"],
         "scenario_version": result["scenario_version"],
+        "evaluation_id": result["evaluation_id"],
         "status": result["status"],
         "success": bool(result["success"]),
         "placed_class": (result.get("placed") or {}).get("class"),
@@ -665,6 +667,13 @@ def _parser() -> argparse.ArgumentParser:
         default="all",
     )
     parser.add_argument("--benchmark-root")
+    parser.add_argument(
+        "--repository-sha",
+        action="append",
+        default=[],
+        metavar="NAME=SHA",
+        help="optional fixed repository revision recorded in the summary",
+    )
     return parser
 
 
@@ -706,10 +715,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             for case, result in results.items()
             if result["status"] != EXPECTED_STATUS[case]
         ]
+        repository_shas: dict[str, str] = {}
+        for spec in args.repository_sha:
+            if "=" not in spec:
+                _fail("USAGE", f"--repository-sha needs NAME=SHA, got {spec!r}")
+            name, sha = spec.split("=", 1)
+            if not name or not sha:
+                _fail("USAGE", f"--repository-sha needs NAME=SHA, got {spec!r}")
+            repository_shas[name] = sha
         summary: dict[str, Any] = {
             "schema": "jcheng.applications.ore_sorting_summary.v1",
             "data_source": DATA_SOURCE,
             "task_id": TASK_ID,
+            "scenario_requirements": {
+                "scenario_id": scenario.scenario_id,
+                "scenario_version": scenario.scenario_version,
+                "evaluation_id": scenario.evaluation_id,
+                "content_hash": scenario.content_hash,
+                "scenario_content_hash": scenario.provenance.get(
+                    "scenario_content_hash"
+                ),
+            },
+            "repository_shas": dict(sorted(repository_shas.items())),
             "cases": {
                 case: {
                     "status": result["status"],
@@ -719,7 +746,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for case, result in results.items()
             },
             "mismatches": mismatches,
+            "artifact_valid": True,
             "capability_match_status": match.status,
+            "capability_satisfied": match.status == "matched",
             "offline_execution_allowed": match.status
             in {"matched", "matched_with_unverified"},
             "deployment_ready": False,

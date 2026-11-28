@@ -189,9 +189,18 @@ def test_all_eight_cases_have_the_expected_classification(tmp_path: Path) -> Non
     summary = _summary(out)
     assert summary["mismatches"] == []
     assert summary["capability_match_status"] == "matched_with_unverified"
+    assert summary["artifact_valid"] is True
+    assert summary["capability_satisfied"] is False
     assert summary["offline_execution_allowed"] is True
     assert summary["deployment_ready"] is False
     assert summary["motion_authorized"] is False
+    assert summary["scenario_requirements"]["evaluation_id"] == (
+        "ore_sorting.evaluation@0.1.0"
+    )
+    sample = json.loads(
+        (out / "samples.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
+    assert sample["evaluation_id"] == "ore_sorting.evaluation@0.1.0"
     assert {case: item["status"] for case, item in summary["cases"].items()} == {
         case: task.EXPECTED_STATUS[case] for case in task.CASES
     }
