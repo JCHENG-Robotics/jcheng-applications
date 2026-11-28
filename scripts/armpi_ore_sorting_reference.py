@@ -101,7 +101,7 @@ _DEVICE_KEYS = frozenset(
         "safety_overlay",
     }
 )
-_DEVICE_OPTIONAL_KEYS = frozenset({"notes"})
+_DEVICE_OPTIONAL_KEYS = frozenset({"notes", "source_hash", "attributes"})
 _SCENARIO_KEYS = frozenset(
     {
         "schema",
@@ -114,6 +114,7 @@ _SCENARIO_KEYS = frozenset(
         "constraints",
         "provenance",
         "simulation_assets",
+        "vocabulary_status",
     }
 )
 _SCENARIO_REQUIRED_KEYS = frozenset(
@@ -130,7 +131,33 @@ _SCENARIO_REQUIRED_KEYS = frozenset(
     }
 )
 _CAPABILITY_KEYS = frozenset({"id", "parameters", "feedback"})
-_REQUIREMENT_KEYS = frozenset({"id", "required", "parameters"})
+_REQUIREMENT_KEYS = frozenset(
+    {
+        "id",
+        "required",
+        "parameters",
+        "requirement_id",
+        "requirement_owner",
+        "role",
+        "interface",
+        "threshold",
+        "statement",
+        "verification",
+        "deferred_to",
+    }
+)
+_ATTRIBUTE_KEYS = frozenset(
+    {
+        "category",
+        "role",
+        "dof",
+        "control_modes",
+        "kinematics_declared",
+        "data_status",
+    }
+)
+_ROLES = frozenset({"arm", "gripper", "camera", "base", "sensor", "teleop"})
+_THRESHOLD_KEYS = frozenset({"op", "value", "unit"})
 _JOINT_KEYS = frozenset({"name", "min_rad", "max_rad"})
 _CONSTRAINT_KEYS = frozenset({"id", "statement"})
 _ASSET_KEYS = frozenset({"id", "path"})
@@ -359,12 +386,19 @@ class Joint:
 class DeviceSnapshot:
     source_device: str
     device_version: str
+    source_hash: str
     content_hash: str
     generated_by: str
     source_path: str
     capabilities: tuple[DeviceCapability, ...]
     joints: tuple[Joint, ...]
+    attributes: Mapping[str, Any]
     safety_overlay: Mapping[str, Any]
+
+    @property
+    def role(self) -> str | None:
+        role = self.attributes.get("role")
+        return role if isinstance(role, str) and role else None
 
 
 @dataclass(frozen=True)
@@ -372,6 +406,14 @@ class Requirement:
     id: str
     required: bool
     parameters: Mapping[str, Any]
+    requirement_id: str = ""
+    requirement_owner: str = "device"
+    role: str | None = None
+    interface: str | None = None
+    threshold: Mapping[str, Any] | None = None
+    statement: str = ""
+    verification: str = ""
+    deferred_to: str | None = None
 
 
 @dataclass(frozen=True)
@@ -435,6 +477,19 @@ def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
     )
     generated_by = _text(document["generated_by"], "device_snapshot.generated_by")
     source_path = _text(document["source_path"], "device_snapshot.source_path")
+    source_hash = ""
+    if "source_hash" in document:
+        source_hash = _text(document["source_hash"], "device_snapshot.source_hash")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", source_hash):
+            _fail(
+                "SCHEMA",
+                "device_snapshot.source_hash: must be sha256:<64 lowercase hex>",
+            )
+    attributes: dict[str, Any] = {}
+    if "attributes" in document:
+        attributes = _snapshot_attributes(
+            document["attributes"], "device_snapshot.attributes"
+        )
 
     raw_capabilities = _list(
         document["capabilities"],
@@ -493,7 +548,7 @@ def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
         )
 
     raw_joints = _list(
-        document["joints"], "device_snapshot.joints", minimum=1, maximum=32
+        document["joints"], "device_snapshot.joints", minimum=0, maximum=32
     )
     joints: list[Joint] = []
     joint_names: set[str] = set()
@@ -536,6 +591,11 @@ def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
             _fail("SCHEMA", f"{where}: min must not exceed max")
         joints.append(Joint(name=name, min_rad=minimum, max_rad=maximum))
 
+    if attributes.get("role") == "arm" and not joints:
+        _fail(
+            "SCHEMA",
+            "device_snapshot.joints: an arm snapshot needs at least one joint",
+        )
     safety_overlay = _mapping(
         document["safety_overlay"], "device_snapshot.safety_overlay"
     )
@@ -545,13 +605,65 @@ def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
     return DeviceSnapshot(
         source_device=source_device,
         device_version=device_version,
+        source_hash=source_hash,
         content_hash=declared_hash,
         generated_by=generated_by,
         source_path=source_path,
         capabilities=tuple(capabilities),
         joints=tuple(joints),
+        attributes=attributes,
         safety_overlay=dict(safety_overlay),
     )
+
+
+def _snapshot_attributes(value: Any, where: str) -> dict[str, Any]:
+    attributes = _mapping(value, where)
+    _optional_keys(
+        attributes,
+        required=frozenset({"category", "role", "dof", "control_modes"}),
+        allowed=_ATTRIBUTE_KEYS,
+        where=where,
+    )
+    category = _text(attributes["category"], f"{where}.category")
+    role = _text(attributes["role"], f"{where}.role")
+    if role not in _ROLES:
+        _fail("SCHEMA", f"{where}.role: unknown device role {role!r}")
+    dof = attributes["dof"]
+    if dof is not None:
+        if not isinstance(dof, int) or isinstance(dof, bool) or dof < 1:
+            _fail("SCHEMA", f"{where}.dof: must be null or a positive integer")
+    modes = attributes["control_modes"]
+    if not isinstance(modes, list) or any(
+        not isinstance(mode, str) for mode in modes
+    ):
+        _fail("SCHEMA", f"{where}.control_modes: must be a list of strings")
+    _check_json_tree(dict(attributes), where)
+    result: dict[str, Any] = {
+        "category": category,
+        "role": role,
+        "dof": dof,
+        "control_modes": list(modes),
+    }
+    if "kinematics_declared" in attributes:
+        result["kinematics_declared"] = _bool(
+            attributes["kinematics_declared"], f"{where}.kinematics_declared"
+        )
+    if "data_status" in attributes:
+        result["data_status"] = _text(
+            attributes["data_status"], f"{where}.data_status"
+        )
+    return result
+
+
+def _threshold(value: Any, where: str) -> dict[str, Any]:
+    item = _mapping(value, where)
+    _exact_keys(item, _THRESHOLD_KEYS, where)
+    op = _text(item["op"], f"{where}.op")
+    if op not in _COMPARISON_OPS:
+        _fail("SCHEMA", f"{where}.op: unknown comparison {op!r}")
+    number = _finite(item["value"], f"{where}.value")
+    unit = _text(item["unit"], f"{where}.unit")
+    return {"op": op, "value": number, "unit": unit}
 
 
 def _reference_id(value: Any, where: str) -> str:
@@ -650,8 +762,71 @@ def scenario_requirements_from_mapping(
             if "parameters" in item
             else {}
         )
+        requirement_owner = "device"
+        if "requirement_owner" in item:
+            requirement_owner = _text(
+                item["requirement_owner"], f"{where}.requirement_owner"
+            )
+            if requirement_owner not in {"device", "algorithm"}:
+                _fail(
+                    "SCHEMA",
+                    f"{where}.requirement_owner: must be 'device' or 'algorithm'",
+                )
+        role = None
+        interface = None
+        threshold = None
+        if requirement_owner == "device":
+            if "role" in item:
+                role = _text(item["role"], f"{where}.role")
+                if role not in _ROLES:
+                    _fail("SCHEMA", f"{where}.role: unknown device role {role!r}")
+            if "interface" in item:
+                interface = _text(item["interface"], f"{where}.interface")
+                if not _CAPABILITY_ID_RE.fullmatch(interface):
+                    _fail(
+                        "SCHEMA",
+                        f"{where}.interface: must match {_CAPABILITY_ID_RE.pattern}",
+                    )
+            if "threshold" in item:
+                threshold = _threshold(item["threshold"], f"{where}.threshold")
+        else:
+            for forbidden in ("role", "interface", "threshold"):
+                if forbidden in item:
+                    _fail(
+                        "SCHEMA",
+                        f"{where}: an algorithm requirement must not declare {forbidden}",
+                    )
+        deferred_to = None
+        if "deferred_to" in item:
+            deferred_to = _text(item["deferred_to"], f"{where}.deferred_to")
+        statement = (
+            _text(item["statement"], f"{where}.statement")
+            if "statement" in item
+            else ""
+        )
+        verification = (
+            _text(item["verification"], f"{where}.verification")
+            if "verification" in item
+            else ""
+        )
         capabilities.append(
-            Requirement(id=capability_id, required=required, parameters=parameters)
+            Requirement(
+                id=capability_id,
+                required=required,
+                parameters=parameters,
+                requirement_id=(
+                    _text(item["requirement_id"], f"{where}.requirement_id")
+                    if "requirement_id" in item
+                    else ""
+                ),
+                requirement_owner=requirement_owner,
+                role=role,
+                interface=interface,
+                threshold=threshold,
+                statement=statement,
+                verification=verification,
+                deferred_to=deferred_to,
+            )
         )
 
     raw_constraints = document["constraints"]
@@ -786,36 +961,77 @@ class CapabilityMatch:
     matched: tuple[Mapping[str, Any], ...]
     optional_absent: tuple[str, ...]
     unused_device_capabilities: tuple[str, ...]
+    unverified: tuple[Mapping[str, Any], ...] = ()
+    deferred: tuple[Mapping[str, Any], ...] = ()
+    status: str = "matched"
 
-    def report(self, device: DeviceSnapshot, scenario: ScenarioRequirements) -> dict[str, Any]:
+    def report(
+        self,
+        device_or_devices: DeviceSnapshot | Mapping[str, DeviceSnapshot],
+        scenario: ScenarioRequirements,
+    ) -> dict[str, Any]:
+        if isinstance(device_or_devices, DeviceSnapshot):
+            devices = {device_or_devices.role or "device": device_or_devices}
+        else:
+            devices = dict(device_or_devices)
+        primary = next(iter(devices.values()))
         return {
-            "status": "matched",
-            "device": device.source_device,
+            "status": self.status,
+            "deployable": self.status == "matched",
+            "device": primary.source_device,
+            "devices": {
+                role: {
+                    "source_device": device.source_device,
+                    "device_version": device.device_version,
+                    "source_hash": device.source_hash,
+                    "content_hash": device.content_hash,
+                    "role": device.role,
+                }
+                for role, device in sorted(devices.items())
+            },
             "scenario": scenario.scenario_id,
             "required_count": sum(
-                1 for item in self.matched if item["required"] is True
+                1
+                for item in (*self.matched, *self.unverified, *self.deferred)
+                if item["required"] is True
             ),
             "matched": [dict(item) for item in self.matched],
+            "unverified": [dict(item) for item in self.unverified],
+            "deferred": [dict(item) for item in self.deferred],
             "optional_absent": list(self.optional_absent),
             "unused_device_capabilities": list(self.unused_device_capabilities),
         }
 
 
 def match_capabilities(
-    device: DeviceSnapshot, scenario: ScenarioRequirements
+    device_or_devices: DeviceSnapshot | Mapping[str, DeviceSnapshot],
+    scenario: ScenarioRequirements,
 ) -> CapabilityMatch:
-    """Match every scenario requirement against the device snapshot.
+    """Match scenario requirements against one device or a role-composed cell.
 
-    A required capability the device does not declare is
-    ``INCOMPATIBLE_CAPABILITY``; a declared capability with a missing or
-    unsatisfied parameter is ``INCOMPATIBLE_PARAMETER``. An optional
-    capability that is absent is recorded, not assumed available.
+    A single snapshot keeps the exact-capability-id contract used by the pinned
+    fixture. A role mapping enables cell composition: each device requirement
+    names a role and a concrete interface, the snapshot filling that role must
+    declare the interface, and a declared threshold is checked only against a
+    device fact. A threshold with no declared fact is ``unverified``; it is
+    never promoted to ``matched``. Algorithm requirements are deferred to their
+    owner and are never matched against a device.
     """
 
+    if isinstance(device_or_devices, DeviceSnapshot):
+        return _match_single_device(device_or_devices, scenario)
+    return _match_cell(device_or_devices, scenario)
+
+
+def _match_single_device(
+    device: DeviceSnapshot, scenario: ScenarioRequirements
+) -> CapabilityMatch:
     device_by_id = {capability.id: capability for capability in device.capabilities}
     matched: list[Mapping[str, Any]] = []
     optional_absent: list[str] = []
     for requirement in scenario.capabilities:
+        if requirement.requirement_owner == "algorithm":
+            continue
         capability = device_by_id.get(requirement.id)
         if capability is None:
             if requirement.required:
@@ -876,6 +1092,169 @@ def match_capabilities(
     )
 
 
+def _match_cell(
+    devices: Mapping[str, DeviceSnapshot], scenario: ScenarioRequirements
+) -> CapabilityMatch:
+    if not devices:
+        _fail("CAPABILITY_CONTRACT", "a cell match needs at least one device")
+    for role, device in devices.items():
+        if role not in _ROLES:
+            _fail("CAPABILITY_CONTRACT", f"unknown composition role {role!r}")
+        declared = device.role
+        if declared is not None and declared != role:
+            _fail(
+                "CAPABILITY_CONTRACT",
+                f"device {device.source_device!r} declares role {declared!r}, "
+                f"but was composed as {role!r}",
+            )
+
+    matched: list[Mapping[str, Any]] = []
+    unverified: list[Mapping[str, Any]] = []
+    deferred: list[Mapping[str, Any]] = []
+    optional_absent: list[str] = []
+    used_capabilities: set[tuple[str, str]] = set()
+
+    for requirement in scenario.capabilities:
+        if requirement.requirement_owner == "algorithm":
+            deferred.append(
+                {
+                    "id": requirement.id,
+                    "requirement_id": requirement.requirement_id,
+                    "required": requirement.required,
+                    "deferred_to": requirement.deferred_to,
+                    "statement": requirement.statement,
+                }
+            )
+            continue
+        if requirement.role is None or requirement.interface is None:
+            _fail(
+                "CAPABILITY_CONTRACT",
+                f"device requirement {requirement.id!r} must declare role and interface",
+            )
+        device = devices.get(requirement.role)
+        if device is None:
+            if requirement.required:
+                _fail(
+                    "NO_DEVICE_FOR_ROLE",
+                    f"device requirement {requirement.id!r} needs role "
+                    f"{requirement.role!r}, but the cell declares no such device",
+                )
+            optional_absent.append(requirement.id)
+            continue
+        capabilities = {capability.id: capability for capability in device.capabilities}
+        capability = capabilities.get(requirement.interface)
+        if capability is None:
+            _fail(
+                "INCOMPATIBLE_CAPABILITY",
+                f"device {device.source_device!r} filling role "
+                f"{requirement.role!r} does not declare interface "
+                f"{requirement.interface!r}",
+            )
+        used_capabilities.add((requirement.role, requirement.interface))
+        base = {
+            "id": requirement.id,
+            "requirement_id": requirement.requirement_id,
+            "required": requirement.required,
+            "role": requirement.role,
+            "interface": requirement.interface,
+            "device": device.source_device,
+            "interface_ok": True,
+            "verification": requirement.verification,
+        }
+        if requirement.threshold is None:
+            unverified.append(
+                {
+                    **base,
+                    "reason": "NO_MACHINE_READABLE_THRESHOLD",
+                    "statement": requirement.statement,
+                }
+            )
+            continue
+
+        actual = _declared_fact(device, capability, requirement)
+        if actual is None:
+            unverified.append(
+                {
+                    **base,
+                    "reason": "DEVICE_FACT_NOT_DECLARED",
+                    "statement": requirement.statement,
+                    "threshold": dict(requirement.threshold),
+                }
+            )
+            continue
+        op = str(requirement.threshold["op"])
+        expected = requirement.threshold["value"]
+        where = (
+            f"device requirement {requirement.id!r} on "
+            f"{device.source_device!r}"
+        )
+        if not _compare(actual, op, expected, where):
+            _fail(
+                "INCOMPATIBLE_PARAMETER",
+                f"{where}: device declares {actual!r}, requirement is "
+                f"{op} {expected!r} {requirement.threshold['unit']}",
+            )
+        matched.append(
+            {
+                **base,
+                "statement": requirement.statement,
+                "threshold": dict(requirement.threshold),
+                "device_value": actual,
+                "evidence": (
+                    "unverified"
+                    if requirement.verification == "Unverified"
+                    else requirement.verification.lower()
+                ),
+            }
+        )
+
+    unused = tuple(
+        sorted(
+            f"{role}:{capability.id}"
+            for role, device in devices.items()
+            for capability in device.capabilities
+            if (role, capability.id) not in used_capabilities
+        )
+    )
+    evidence_unverified = any(
+        item.get("verification") == "Unverified" for item in matched
+    )
+    if not matched and unverified:
+        status = "unverified"
+    elif unverified or evidence_unverified:
+        status = "matched_with_unverified"
+    else:
+        status = "matched"
+    return CapabilityMatch(
+        matched=tuple(matched),
+        optional_absent=tuple(optional_absent),
+        unused_device_capabilities=unused,
+        unverified=tuple(unverified),
+        deferred=tuple(deferred),
+        status=status,
+    )
+
+
+def _declared_fact(
+    device: DeviceSnapshot,
+    capability: DeviceCapability,
+    requirement: Requirement,
+) -> Any:
+    """Return a device fact for a threshold, or ``None`` when none is declared."""
+
+    property_name = requirement.id.rsplit(".", 1)[-1]
+    if property_name in device.attributes:
+        value = device.attributes[property_name]
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return value
+        return None
+    if property_name in capability.parameters:
+        value = capability.parameters[property_name]
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return value
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Deterministic plan
 # ---------------------------------------------------------------------------
@@ -900,8 +1279,20 @@ def build_reference_recipe(
     """
 
     matched_ids = {item["id"] for item in match.matched}
+    interfaces = {
+        item["interface"]
+        for item in (*match.matched, *match.unverified)
+        if item.get("interface_ok") is True and "interface" in item
+    }
+    arm_ready = "arm.position_control" in interfaces or any(
+        capability_id.startswith("manipulation.arm.")
+        for capability_id in matched_ids
+    )
+    gripper_ready = "end_effector.position_control" in interfaces or (
+        "manipulation.gripper.aperture_m" in matched_ids
+    )
     steps: list[dict[str, Any]] = []
-    if any(capability_id.startswith("manipulation.arm.") for capability_id in matched_ids):
+    if arm_ready:
         steps.append(
             {
                 "name": "home",
@@ -911,7 +1302,7 @@ def build_reference_recipe(
                 "params": dict(_HOME_PARAMS),
             }
         )
-    if "manipulation.gripper.aperture_m" in matched_ids:
+    if gripper_ready:
         steps.append(
             {
                 "name": "prepare-gripper",
@@ -1530,13 +1921,57 @@ def _write_samples(path: Path, samples: Sequence[Mapping[str, Any]]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _load_devices(
+    specs: Sequence[str],
+) -> tuple[DeviceSnapshot | Mapping[str, DeviceSnapshot], bool]:
+    """Load one legacy snapshot or a role-keyed cell composition."""
+
+    if not specs:
+        _fail("INPUT", "at least one --device-snapshot is required")
+    parsed: list[tuple[str | None, Path]] = []
+    for spec in specs:
+        if "=" in spec:
+            role, raw_path = spec.split("=", 1)
+            if role in _ROLES:
+                parsed.append((role, Path(raw_path)))
+                continue
+        parsed.append((None, Path(spec)))
+    if len(parsed) > 1 and any(role is None for role, _ in parsed):
+        _fail(
+            "INPUT",
+            "multiple snapshots need an explicit role: --device-snapshot ROLE=PATH",
+        )
+    if len(parsed) == 1 and parsed[0][0] is None:
+        return device_snapshot_from_mapping(load_document(parsed[0][1])), False
+
+    devices: dict[str, DeviceSnapshot] = {}
+    for role, path in parsed:
+        assert role is not None
+        if role in devices:
+            _fail("INPUT", f"duplicate composition role {role!r}")
+        device = device_snapshot_from_mapping(load_document(path))
+        if device.role is not None and device.role != role:
+            _fail(
+                "INPUT",
+                f"snapshot {device.source_device!r} declares role "
+                f"{device.role!r}, not {role!r}",
+            )
+        devices[role] = device
+    return devices, True
+
+
 def run_reference(args: argparse.Namespace) -> int:
-    device_document = load_document(Path(args.device_snapshot))
+    device_or_devices, cell = _load_devices(args.device_snapshot)
+    if isinstance(device_or_devices, DeviceSnapshot):
+        device = device_or_devices
+        devices: dict[str, DeviceSnapshot] = {}
+    else:
+        devices = dict(device_or_devices)
+        device = devices.get("arm") or next(iter(devices.values()))
     scenario_document = load_document(Path(args.scenario_requirements))
-    device = device_snapshot_from_mapping(device_document)
     scenario = scenario_requirements_from_mapping(scenario_document)
 
-    match = match_capabilities(device, scenario)
+    match = match_capabilities(device_or_devices, scenario)
     recipe = build_reference_recipe(device, scenario, match)
     plan = build_plan(recipe, RUN_ID)
     plan_payload = plan_document(plan, scenario)
@@ -1572,11 +2007,13 @@ def run_reference(args: argparse.Namespace) -> int:
         "device": {
             "source_device": device.source_device,
             "device_version": device.device_version,
+            "source_hash": device.source_hash,
             "content_hash": device.content_hash,
             "generated_by": device.generated_by,
             "source_path": device.source_path,
             "joint_count": len(device.joints),
             "joint_names": [joint.name for joint in device.joints],
+            "attributes": dict(device.attributes),
             "safety_overlay": dict(device.safety_overlay),
         },
         "scenario_requirements": {
@@ -1588,7 +2025,11 @@ def run_reference(args: argparse.Namespace) -> int:
             "constraint_count": len(scenario.constraints),
             "provenance": dict(scenario.provenance),
         },
-        "capability_match": match.report(device, scenario),
+        "cell": {
+            "composed": cell,
+            "roles": sorted(devices),
+        },
+        "capability_match": match.report(device_or_devices, scenario),
         "plan": plan_payload,
         "task_evaluation": {
             "evaluated": False,
@@ -1615,9 +2056,11 @@ def run_reference(args: argparse.Namespace) -> int:
             "Synthetic offline reference: no hardware, DDS, ROS or device access.",
             "Mock step completion is not ore-sorting task success; no success "
             "threshold is evaluated.",
-            "Device capability parameter values are pinned fixture declarations, "
+            "Device capability values come from generated declarative snapshots, "
             "not measurements.",
-            "Perception capabilities are declared by the fixture; no perception "
+            "A requirement with no declared device fact is reported as "
+            "unverified and is never promoted to matched.",
+            "Algorithm requirements are deferred to their owner; no perception "
             "code runs.",
             "The simulation check only verifies declared asset paths; no plant "
             "is launched and no domain is joined.",
@@ -1643,7 +2086,7 @@ def run_reference(args: argparse.Namespace) -> int:
         return 1
     print(
         "armpi-ore-sorting-reference: "
-        f"{device.source_device}@{device.device_version} x "
+        f"{'+'.join(sorted(devices)) or device.source_device} x "
         f"{scenario.scenario_id}@{scenario.scenario_version}: "
         f"{len(plan.steps)} plan step(s), mock {mock_results['happy_path']['state']}, "
         f"simulation {simulation_check['status']}, "
@@ -1663,7 +2106,14 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--device-snapshot", required=True, help="device snapshot YAML/JSON"
+        "--device-snapshot",
+        action="append",
+        required=True,
+        metavar="[ROLE=]PATH",
+        help=(
+            "device snapshot YAML/JSON; repeat with ROLE=PATH to compose a "
+            "cell (arm, gripper, camera, base, sensor, teleop)"
+        ),
     )
     parser.add_argument(
         "--scenario-requirements",
