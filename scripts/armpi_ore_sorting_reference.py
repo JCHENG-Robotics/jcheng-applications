@@ -170,6 +170,13 @@ _JOINT_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _PARAMETER_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
+_FACT_UNITS = {
+    "dof": "joints",
+    "reach_m": "m",
+    "payload_kg": "kg",
+    "aperture_m": "m",
+    "resolution_px": "px",
+}
 _ORDERING_OPS = frozenset({">=", "<=", ">", "<"})
 _COMPARISON_OPS = _ORDERING_OPS | frozenset({"==", "!="})
 
@@ -977,7 +984,10 @@ class CapabilityMatch:
         primary = next(iter(devices.values()))
         return {
             "status": self.status,
-            "deployable": self.status == "matched",
+            "capability_satisfied": self.status == "matched",
+            "deployable": self.status == "matched",  # deprecated alias
+            "deployment_ready": False,
+            "motion_authorized": False,
             "device": primary.source_device,
             "devices": {
                 role: {
@@ -1171,6 +1181,14 @@ def _match_cell(
             )
             continue
 
+        property_name = requirement.id.rsplit(".", 1)[-1]
+        expected_unit = _FACT_UNITS.get(property_name)
+        if expected_unit is not None and requirement.threshold["unit"] != expected_unit:
+            _fail(
+                "INCOMPATIBLE_UNIT",
+                f"device requirement {requirement.id!r} uses unit "
+                f"{requirement.threshold['unit']!r}, expected {expected_unit!r}",
+            )
         actual = _declared_fact(device, capability, requirement)
         if actual is None:
             unverified.append(
@@ -1781,7 +1799,7 @@ def run_benchmark(
         return result
 
     result["exit_code"] = completed_process.returncode
-    if completed_process.returncode not in (0, 2) or not json_report.is_file():
+    if completed_process.returncode not in (0, 1, 2) or not json_report.is_file():
         result["stdout_tail"] = completed_process.stdout[-4000:]
         result["stderr_tail"] = completed_process.stderr[-4000:]
         result["reason"] = (
@@ -2028,6 +2046,14 @@ def run_reference(args: argparse.Namespace) -> int:
         "cell": {
             "composed": cell,
             "roles": sorted(devices),
+        },
+        "acceptance_gates": {
+            "artifact_valid": True,
+            "capability_match_status": match.status,
+            "offline_execution_allowed": match.status
+            in {"matched", "matched_with_unverified"},
+            "deployment_ready": False,
+            "motion_authorized": False,
         },
         "capability_match": match.report(device_or_devices, scenario),
         "plan": plan_payload,

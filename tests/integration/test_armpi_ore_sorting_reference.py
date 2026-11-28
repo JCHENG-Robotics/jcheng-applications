@@ -677,3 +677,30 @@ def test_cell_composition_rejects_a_threshold_mismatch(
     )
     assert code == 1
     assert "INCOMPATIBLE_PARAMETER" in capsys.readouterr().err
+
+
+def test_cell_composition_rejects_a_threshold_unit_mismatch(
+    tmp_path: Path, capsys
+) -> None:
+    arm, gripper, camera, scenario = _write_cell(tmp_path)
+    document = yaml.safe_load(scenario.read_text(encoding="utf-8"))
+    for item in document["capabilities"]:
+        if item["id"] == "manipulation.arm.dof":
+            item["threshold"]["unit"] = "cm"
+    _write(scenario, document)
+    code = reference.main(
+        [
+            "--device-snapshot",
+            f"arm={arm}",
+            "--device-snapshot",
+            f"gripper={gripper}",
+            "--device-snapshot",
+            f"camera={camera}",
+            "--scenario-requirements",
+            str(scenario),
+            "--out",
+            str(tmp_path / "out"),
+        ]
+    )
+    assert code == 1
+    assert "INCOMPATIBLE_UNIT" in capsys.readouterr().err
