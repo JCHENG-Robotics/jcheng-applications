@@ -22,9 +22,9 @@ from typing import Any, Iterable, Mapping
 import yaml
 
 CONTRACT_HASH = (
-    "sha256:afca22a42f7163e0351d185d5a8577b0b51f2f3da4b92278f161a4a7d2c35b1c"
+    "sha256:8bc92d18a503ec54db443596eec232b5117f4c6d510f7493d4e107b93a5d3358"
 )
-INTERFACES_RANGE = ">=0.2,<0.3"
+INTERFACES_RANGE = ">=0.3,<0.4"
 SYSTEM_API_RANGE = ">=0.1,<0.2"
 CONTRACT_VERSION: dict[str, Any] = {
     "major": 0,
@@ -756,7 +756,7 @@ def recipe_from_mapping(value: Any, *, source: str = "<mapping>") -> Recipe:
     if contract_hash != CONTRACT_HASH:
         _fail(
             f"{source}.contract_hash",
-            f"must equal the pinned v0.2.0 contract hash {CONTRACT_HASH}",
+            f"must equal the pinned v0.3.0 contract hash {CONTRACT_HASH}",
         )
 
     raw_scopes = _string_list(recipe["scopes"], f"{source}.scopes")

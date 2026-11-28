@@ -99,8 +99,8 @@ exercises this path on the mock without any workaround.
 
 ## Dependencies
 
-- `jcheng-interfaces` `>=0.2,<0.3`; contract hash
-  `sha256:afca22a42f7163e0351d185d5a8577b0b51f2f3da4b92278f161a4a7d2c35b1c`.
+- `jcheng-interfaces` `>=0.3,<0.4`; contract hash
+  `sha256:8bc92d18a503ec54db443596eec232b5117f4c6d510f7493d4e107b93a5d3358`.
 - `jcheng-system` API `>=0.1,<0.2`; the gateway is the only robot-facing path
   and the system layer is the only origin of motion.
 - `jcheng-studio` owns the human-facing session authorization and diagnostics.

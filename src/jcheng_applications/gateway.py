@@ -310,7 +310,7 @@ def stop_receipt_from_mapping(payload: Any) -> StopReceipt:
 
 
 def contract_in_range(info: ContractInfo) -> bool:
-    """Return whether the contract lies in ``>=0.2,<0.3`` and matches the pin."""
+    """Return whether the contract lies in ``>=0.3,<0.4`` and matches the pin."""
 
     return (
         info.major == 0
