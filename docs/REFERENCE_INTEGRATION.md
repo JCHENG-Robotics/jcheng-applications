@@ -48,11 +48,13 @@ duplicate IDs and malformed paths are rejected.
 | `schema` | exactly `jcheng.device_snapshot.v1` |
 | `source_device` | stable ID such as `hiwonder.armpi-ultra` |
 | `device_version` | `MAJOR.MINOR.PATCH` |
+| `source_hash` | optional source-profile hash from the devices generator |
 | `content_hash` | canonical hash of the document, see §2.3 |
 | `generated_by` | non-empty generator identity |
 | `source_path` | non-empty source profile path |
 | `capabilities[]` | `{id, parameters, feedback}`; IDs are unique; `parameters` is a flat mapping; `feedback` is a string list |
-| `joints[]` | `{name, min_rad, max_rad}`, unique names, `min_rad <= max_rad` |
+| `joints[]` | `{name, min_rad, max_rad}`, unique names, `min_rad <= max_rad`; empty for a non-arm device |
+| `attributes` | optional `{category, role, dof, control_modes}`; `dof` is null when undeclared |
 | `safety_overlay` | mapping; recorded, never applied as a limit here |
 
 ### 2.2 Scenario requirements — `jcheng.scenario_requirements.v1`
@@ -62,20 +64,39 @@ duplicate IDs and malformed paths are rejected.
 | `schema` | exactly `jcheng.scenario_requirements.v1` |
 | `scenario_id` | stable ID such as `ore_sorting` |
 | `scenario_version` | `MAJOR.MINOR.PATCH` |
+| `vocabulary_status` | optional `local_draft` / `proposed` / `contracted` |
 | `content_hash` | canonical hash of the document, see §2.3 |
 | `task_id` / `evaluation_id` | `<id>@MAJOR.MINOR.PATCH`; the version must equal `scenario_version` |
-| `capabilities[]` | `{id, required, parameters?}`; IDs are unique |
+| `capabilities[]` | `{id, required, ...}`; IDs are unique; see §2.4 |
 | `constraints[]` | `{id, statement}`, unique IDs |
 | `provenance` | non-empty mapping |
 | `simulation_assets[]` | optional `{id, path}`; a relative path under `--simulation-root` |
 
-A requirement parameter is an expectation, not a device value:
+A structured requirement is an expectation, not a device value:
 
 ```yaml
-parameters:
-  reach_m: {op: ">=", value: 0.45}   # explicit comparison
-  dof: 4                             # shorthand for == 4
+- id: manipulation.arm.dof
+  requirement_owner: device
+  role: arm
+  interface: arm.position_control
+  required: true
+  threshold: {op: ">=", value: 4, unit: joints}
+  statement: ">= 4 independently commanded joints"
+  verification: Unverified
+- id: perception.scene_state
+  requirement_owner: algorithm
+  required: true
+  deferred_to: jcheng-perception
+  statement: "advisory scene state"
+  verification: Unverified
 ```
+
+`role` selects the device in the cell. `interface` must be declared by that
+device. `threshold` is checked only against a declared device fact (for example
+`attributes.dof`); if the fact is absent the requirement is `unverified`, never
+promoted. Algorithm requirements are deferred to `deferred_to` and are not
+matched against any device. The legacy `parameters` mapping on a
+single-device requirement is still accepted.
 
 Supported operators are `>=`, `<=`, `>`, `<`, `==`, `!=`. An ordering
 comparison requires two numbers; comparing a boolean or a string is rejected.
@@ -89,14 +110,24 @@ no whitespace, `ensure_ascii`). Any other edit without regeneration is
 reported as `STALE_DEVICE_HASH` or `STALE_SCENARIO_HASH`; the script does not
 silently pin a new value.
 
-### 2.4 Capability vocabulary
+### 2.4 Capability vocabulary and cell composition
 
-The fixture capability IDs mirror the scenario requirement vocabulary
-(`manipulation.arm.reach_m`, `perception.scene_state`, ...). The device
-registry currently uses native IDs (`arm.position_control`, ...). The mapping
-between the two is a **fixture decision for this reference**, not an
-interfaces contract. A real devices generator and a second real consumer are
-required before the vocabulary is promoted.
+Two paths are supported:
+
+- **Legacy single snapshot** (the pinned fixture): requirement IDs are matched
+  exactly against capability IDs in one device snapshot.
+- **Generated cell** (the real devices/scenarios artifacts): each device
+  requirement names a role and a native interface (`arm.position_control`,
+  `end_effector.position_control`, `sensor.rgb_stream`, ...). Pass one
+  snapshot per role:
+
+  ```bash
+  --device-snapshot arm=.../arm.yaml   --device-snapshot gripper=.../gripper.yaml   --device-snapshot camera=.../camera.yaml
+  ```
+
+The vocabulary is still `local_draft`; it is not an `jcheng-interfaces`
+contract until a reviewed proposal is accepted. No device is claimed verified
+just because its interface is present: a missing fact stays `unverified`.
 
 ## 3. Commands
 
@@ -178,7 +209,16 @@ The match is strict and fails closed:
 | A required capability is not declared by the device snapshot | `INCOMPATIBLE_CAPABILITY` |
 | A device capability lacks a required parameter | `INCOMPATIBLE_PARAMETER` |
 | A parameter comparison is unsatisfied or type-incompatible | `INCOMPATIBLE_PARAMETER` |
+| A role in a device requirement has no composed device | `NO_DEVICE_FOR_ROLE` |
+| A composed device lacks the required interface | `INCOMPATIBLE_CAPABILITY` |
+| A declared threshold is not met | `INCOMPATIBLE_PARAMETER` |
+| A threshold fact is not declared | recorded in `capability_match.unverified`; never matched |
+| A requirement is algorithm-owned | recorded in `capability_match.deferred` |
 | An optional capability is absent | recorded in `capability_match.optional_absent`; not assumed available |
+
+`capability_match.status` is `matched`, `matched_with_unverified`, `unverified`
+or fails closed. Only `matched` sets `deployable: true`; the real ArmPi cell is
+`matched_with_unverified` until the missing facts are measured.
 
 ### 4.3 Mock execution, lease and stop
 
