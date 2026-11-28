@@ -451,3 +451,229 @@ def test_simulation_asset_path_escape_is_rejected(tmp_path, capsys):
     code, _ = _run(tmp_path, scenario=path)
     assert code == 1
     assert "SCHEMA" in capsys.readouterr().err
+
+
+def _cell_device(role: str, device_id: str, capabilities: list[dict]) -> dict:
+    attributes = {
+        "category": {
+            "arm": "arm",
+            "gripper": "end_effector",
+            "camera": "sensor",
+        }[role],
+        "role": role,
+        "dof": 5 if role == "arm" else None,
+        "control_modes": ["position"] if role == "arm" else [],
+        "kinematics_declared": role == "arm",
+    }
+    joints = (
+        [{"name": "joint1", "role": "shoulder_pan", "limits": {"min_deg": -90, "max_deg": 90}}]
+        if role == "arm"
+        else []
+    )
+    return {
+        "schema": "jcheng.device_snapshot.v1",
+        "source_device": device_id,
+        "device_version": "0.1.0",
+        "source_hash": "sha256:" + "a" * 64,
+        "content_hash": "",
+        "generated_by": "test",
+        "source_path": f"registry/devices/{device_id}.yaml",
+        "capabilities": capabilities,
+        "joints": joints,
+        "attributes": attributes,
+        "safety_overlay": {
+            "applied": False,
+            "source": None,
+            "content_hash": None,
+            "stricter_wins": True,
+        },
+        "notes": "test snapshot",
+    }
+
+
+def _cell_requirements(*, dof_threshold: float = 4) -> dict:
+    def requirement(
+        capability: str,
+        requirement_id: str,
+        role: str,
+        interface: str,
+        threshold: dict | None = None,
+    ) -> dict:
+        item = {
+            "id": capability,
+            "requirement_id": requirement_id,
+            "requirement_owner": "device",
+            "required": True,
+            "role": role,
+            "interface": interface,
+            "statement": "test requirement",
+            "verification": "Unverified",
+        }
+        if threshold is not None:
+            item["threshold"] = threshold
+        return item
+
+    return {
+        "schema": "jcheng.scenario_requirements.v1",
+        "scenario_id": "ore_sorting",
+        "scenario_version": "0.1.0",
+        "vocabulary_status": "local_draft",
+        "content_hash": "",
+        "task_id": "ore_sorting.task@0.1.0",
+        "evaluation_id": "ore_sorting.evaluation@0.1.0",
+        "capabilities": [
+            requirement(
+                "manipulation.arm.dof",
+                "arm_dof",
+                "arm",
+                "arm.position_control",
+                {"op": ">=", "value": dof_threshold, "unit": "joints"},
+            ),
+            requirement(
+                "manipulation.arm.reach_m",
+                "arm_reach",
+                "arm",
+                "arm.position_control",
+                {"op": ">=", "value": 0.45, "unit": "m"},
+            ),
+            requirement(
+                "manipulation.gripper.aperture_m",
+                "gripper_aperture",
+                "gripper",
+                "end_effector.position_control",
+                {"op": ">=", "value": 0.04, "unit": "m"},
+            ),
+            {
+                "id": "sensing.camera.resolution_px",
+                "requirement_id": "camera_resolution",
+                "requirement_owner": "device",
+                "required": True,
+                "role": "camera",
+                "interface": "sensor.rgb_stream",
+                "statement": "640 x 480",
+                "verification": "Unverified",
+            },
+            {
+                "id": "perception.scene_state",
+                "requirement_id": "scene_state",
+                "requirement_owner": "algorithm",
+                "required": True,
+                "deferred_to": "jcheng-perception",
+                "statement": "advisory scene state",
+                "verification": "Unverified",
+            },
+        ],
+        "constraints": [{"id": "mock_only", "statement": "offline only"}],
+        "provenance": {"generated_by": "test"},
+    }
+
+
+def _write_cell(tmp_path: Path, *, dof_threshold: float = 4) -> tuple[Path, Path, Path, Path]:
+    arm = _write(
+        tmp_path / "arm.yaml",
+        _cell_device(
+            "arm",
+            "hiwonder.armpi-ultra",
+            [
+                {
+                    "id": "arm.position_control",
+                    "parameters": {},
+                    "feedback": [{"name": "position_deg", "type": "float"}],
+                }
+            ],
+        ),
+    )
+    gripper = _write(
+        tmp_path / "gripper.yaml",
+        _cell_device(
+            "gripper",
+            "hiwonder.armpi-ultra-gripper",
+            [
+                {
+                    "id": "end_effector.position_control",
+                    "parameters": {},
+                    "feedback": [],
+                }
+            ],
+        ),
+    )
+    camera = _write(
+        tmp_path / "camera.yaml",
+        _cell_device(
+            "camera",
+            "intel.realsense-d435i",
+            [{"id": "sensor.rgb_stream", "parameters": {}, "feedback": []}],
+        ),
+    )
+    scenario = _write(
+        tmp_path / "requirements.yaml",
+        _cell_requirements(dof_threshold=dof_threshold),
+    )
+    return arm, gripper, camera, scenario
+
+
+def test_cell_composition_classifies_unverified_and_deferred(tmp_path: Path) -> None:
+    arm, gripper, camera, scenario = _write_cell(tmp_path)
+    out = tmp_path / "out"
+    code = reference.main(
+        [
+            "--device-snapshot",
+            f"arm={arm}",
+            "--device-snapshot",
+            f"gripper={gripper}",
+            "--device-snapshot",
+            f"camera={camera}",
+            "--scenario-requirements",
+            str(scenario),
+            "--out",
+            str(out),
+        ]
+    )
+    assert code == 0
+    report = _report(out)
+    match = report["capability_match"]
+    assert report["cell"] == {
+        "composed": True,
+        "roles": ["arm", "camera", "gripper"],
+    }
+    assert match["status"] == "matched_with_unverified"
+    assert match["deployable"] is False
+    assert [item["id"] for item in match["matched"]] == ["manipulation.arm.dof"]
+    assert match["matched"][0]["device_value"] == 5
+    reasons = {
+        (item["id"], item["reason"]) for item in match["unverified"]
+    }
+    assert reasons == {
+        ("manipulation.arm.reach_m", "DEVICE_FACT_NOT_DECLARED"),
+        ("manipulation.gripper.aperture_m", "DEVICE_FACT_NOT_DECLARED"),
+        ("sensing.camera.resolution_px", "NO_MACHINE_READABLE_THRESHOLD"),
+    }
+    assert [item["deferred_to"] for item in match["deferred"]] == [
+        "jcheng-perception"
+    ]
+    assert [step["kind"] for step in report["plan"]["steps"]] == [
+        "HOME",
+        "GRIPPER",
+    ]
+
+
+def test_cell_composition_rejects_a_threshold_mismatch(
+    tmp_path: Path, capsys
+) -> None:
+    arm, gripper, camera, scenario = _write_cell(tmp_path, dof_threshold=6)
+    code = reference.main(
+        [
+            "--device-snapshot",
+            f"arm={arm}",
+            "--device-snapshot",
+            f"gripper={gripper}",
+            "--device-snapshot",
+            f"camera={camera}",
+            "--scenario-requirements",
+            str(scenario),
+            "--out",
+            str(tmp_path / "out"),
+        ]
+    )
+    assert code == 1
+    assert "INCOMPATIBLE_PARAMETER" in capsys.readouterr().err
