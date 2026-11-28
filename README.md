@@ -59,6 +59,8 @@ jcheng-applications/
 │   ├── ARCHITECTURE.md             # planes, components and the run state machine
 │   ├── INTEGRATION.md              # gateway contract, admission and failure semantics
 │   ├── RECIPES.md                  # recipe format, steps, idempotency and authorization
+│   ├── REFERENCE_INTEGRATION.md    # pinned artifact reference and cell matching
+│   ├── ORE_SORTING_MOCK_TASK.md    # eight-case synthetic task over the mock gateway
 │   ├── TASK_ENGINE.md              # design: tree executor, supervisor and strategy selection
 │   └── M1_5_VALIDATION.md          # isolated py_trees technical validation report
 ├── recipes/

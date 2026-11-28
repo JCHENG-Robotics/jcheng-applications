@@ -977,7 +977,10 @@ class CapabilityMatch:
         primary = next(iter(devices.values()))
         return {
             "status": self.status,
-            "deployable": self.status == "matched",
+            "capability_satisfied": self.status == "matched",
+            "deployable": self.status == "matched",  # deprecated alias
+            "deployment_ready": False,
+            "motion_authorized": False,
             "device": primary.source_device,
             "devices": {
                 role: {
@@ -1781,7 +1784,7 @@ def run_benchmark(
         return result
 
     result["exit_code"] = completed_process.returncode
-    if completed_process.returncode not in (0, 2) or not json_report.is_file():
+    if completed_process.returncode not in (0, 1, 2) or not json_report.is_file():
         result["stdout_tail"] = completed_process.stdout[-4000:]
         result["stderr_tail"] = completed_process.stderr[-4000:]
         result["reason"] = (
@@ -2028,6 +2031,14 @@ def run_reference(args: argparse.Namespace) -> int:
         "cell": {
             "composed": cell,
             "roles": sorted(devices),
+        },
+        "acceptance_gates": {
+            "artifact_valid": True,
+            "capability_match_status": match.status,
+            "offline_execution_allowed": match.status
+            in {"matched", "matched_with_unverified"},
+            "deployment_ready": False,
+            "motion_authorized": False,
         },
         "capability_match": match.report(device_or_devices, scenario),
         "plan": plan_payload,

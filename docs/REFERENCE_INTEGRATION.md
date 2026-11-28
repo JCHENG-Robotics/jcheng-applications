@@ -217,8 +217,20 @@ The match is strict and fails closed:
 | An optional capability is absent | recorded in `capability_match.optional_absent`; not assumed available |
 
 `capability_match.status` is `matched`, `matched_with_unverified`, `unverified`
-or fails closed. Only `matched` sets `deployable: true`; the real ArmPi cell is
-`matched_with_unverified` until the missing facts are measured.
+or fails closed. `capability_satisfied` is true only for `matched`.
+`deployable` is a **deprecated alias** for this capability-only result; the
+report also states the separate gates explicitly:
+
+| Gate | Source | Reference value |
+|---|---|---|
+| `artifact_valid` | schema/identity/hash validation completed | `true` |
+| `capability_match_status` | declared capability matching | `matched_with_unverified` |
+| `offline_execution_allowed` | usable for an isolated mock experiment | `true` |
+| `deployment_ready` | verified deployment conditions | `false` |
+| `motion_authorized` | system runtime authorization | `false` |
+
+The real ArmPi cell is `matched_with_unverified` until the missing facts are
+measured. No capability result authorizes real hardware motion.
 
 ### 4.3 Mock execution, lease and stop
 
