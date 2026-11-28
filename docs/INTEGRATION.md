@@ -14,7 +14,7 @@ manifest it finds:
 |---|---|---|
 | `name` | `jcheng-applications` | application identity |
 | `version` | `0.1.0` | must match `VERSION` |
-| `contract.interfaces` | `>=0.2,<0.3` | pinned contract range |
+| `contract.interfaces` | `>=0.3,<0.4` | pinned contract range |
 | `contract.contract_hash` | `sha256:afca22…c35b1c` | must match the interfaces manifest |
 | `safety.class` | `motion_source` | a gateway intent source, not a DDS publisher |
 | `safety.scopes` | `arm`, `gripper` | exactly the recipe scopes shipped here |
