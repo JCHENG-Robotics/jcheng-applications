@@ -194,6 +194,7 @@ def test_all_eight_cases_have_the_expected_classification(tmp_path: Path) -> Non
     assert summary["offline_execution_allowed"] is True
     assert summary["deployment_ready"] is False
     assert summary["motion_authorized"] is False
+    assert summary["cell_roles"] == ["arm", "camera", "gripper"]
     assert summary["scenario_requirements"]["evaluation_id"] == (
         "ore_sorting.evaluation@0.1.0"
     )

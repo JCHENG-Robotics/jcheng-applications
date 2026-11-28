@@ -8,6 +8,10 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- Mock task provenance: samples carry `scenario_id`/`scenario_version`/
+  `evaluation_id`; the summary carries `scenario_requirements`,
+  `repository_shas`, `artifact_valid`, `capability_satisfied` and `cell_roles`.
+  A repeated `--repository-sha NAME=SHA` records fixed revisions.
 - Minimal synthetic ore-sorting task (`scripts/ore_sorting_mock_task.py`,
   eight cases: normal, no-target, unreachable, grasp-failure, timeout,
   authorization-failure, stop-request, capability-unmet). It reuses the

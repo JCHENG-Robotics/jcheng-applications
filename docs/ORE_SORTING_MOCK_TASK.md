@@ -78,10 +78,15 @@ python3 scripts/ore_sorting_mock_task.py \
   --device-snapshot camera=/tmp/b1/camera.yaml \
   --scenario-requirements /tmp/b1/requirements.json \
   --out /tmp/b1/ore-task \
-  --benchmark-root /path/to/jcheng-benchmark
+  --benchmark-root /path/to/jcheng-benchmark \
+  --repository-sha applications=<sha> \
+  --repository-sha devices=<sha> \
+  --repository-sha scenarios=<sha> \
+  --repository-sha benchmark=<sha>
 ```
 
-`--case all` is the default; a single case can be selected. Exit code 0 means
+`--repository-sha NAME=SHA` is optional and records fixed revisions in the
+summary. `--case all` is the default; a single case can be selected. Exit code 0 means
 every selected case matched its expected classification and the benchmark
 discrimination check passed.
 
@@ -90,9 +95,10 @@ Outputs:
 - `case-<name>.json` — observation, target, task status, run report, artifact
   hashes and limitations;
 - `samples.jsonl` — one `data_source: synthetic` sample per case;
-- `task_summary.json` — case matrix and the explicit gates:
-  `offline_execution_allowed`, `deployment_ready: false`,
-  `motion_authorized: false`;
+- `task_summary.json` — case matrix, `cell_roles`, `scenario_requirements`
+  (scenario/evaluation IDs and hashes), `repository_shas`, `artifact_valid`,
+  `capability_satisfied`, `offline_execution_allowed`,
+  `deployment_ready: false`, `motion_authorized: false`;
 - `benchmark-{observed,test-pass,test-fail}/` — suite and report.
 
 ## 6. Benchmark discrimination

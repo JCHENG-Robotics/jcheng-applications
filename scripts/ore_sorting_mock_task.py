@@ -727,6 +727,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "schema": "jcheng.applications.ore_sorting_summary.v1",
             "data_source": DATA_SOURCE,
             "task_id": TASK_ID,
+            "cell_roles": sorted(devices),
             "scenario_requirements": {
                 "scenario_id": scenario.scenario_id,
                 "scenario_version": scenario.scenario_version,
