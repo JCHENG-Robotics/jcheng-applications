@@ -103,6 +103,13 @@ class _Probe:
                 if method is None or item["method"] == method
             ]
 
+    @property
+    def request_log(self) -> list[dict[str, Any]]:
+        """Return a copy of the recorded requests for offline checks."""
+
+        with self.lock:
+            return list(self.requests)
+
 
 class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"

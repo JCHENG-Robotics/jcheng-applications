@@ -205,4 +205,5 @@ The M2 read-only transport never enters the run state machine. Its failures are:
 - [`INTEGRATION.md`](INTEGRATION.md) — gateway admission, transport and failure rules.
 - [`RECIPES.md`](RECIPES.md) — recipe syntax, step kinds and authorization.
 - [`TASK_ENGINE.md`](TASK_ENGINE.md) — planned tree executor, supervisor, branches and selection (design only).
+- [`REFERENCE_INTEGRATION.md`](REFERENCE_INTEGRATION.md) — offline ArmPi Ultra × ore_sorting reference over the mock gateway (synthetic only).
 - [README](../README.md) / [ROADMAP](../ROADMAP.md) / [ACCEPTANCE](../ACCEPTANCE.md).

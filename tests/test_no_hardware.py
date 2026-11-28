@@ -5,6 +5,8 @@ the robot and the boundaries. The package is ROS-free. Two adapters may
 import ``http.client``: the M2 read-only ``transport.py`` and the M3
 ``write_transport.py``. Every other source file stays transport-free; the
 read-only adapter is GET-only and the write adapter refuses non-mock gateways.
+The offline reference script may import ``subprocess`` only to invoke the
+benchmark repository's CLI; it opens no device, DDS or network path.
 """
 
 from __future__ import annotations
@@ -56,9 +58,14 @@ FORBIDDEN = (
 
 TRANSPORT = Path("src/jcheng_applications/transport.py")
 WRITE_TRANSPORT = Path("src/jcheng_applications/write_transport.py")
+REFERENCE = Path("scripts/armpi_ore_sorting_reference.py")
 TOKEN_ALLOWLIST = {
     TRANSPORT: {"http.client"},
     WRITE_TRANSPORT: {"http.client"},
+    # The offline reference invokes the benchmark repository's CLI as a
+    # subprocess. It opens no device, DDS or network path and imports no other
+    # process-spawning token.
+    REFERENCE: {"subprocess"},
 }
 
 ARTIFACT_SUFFIXES = {

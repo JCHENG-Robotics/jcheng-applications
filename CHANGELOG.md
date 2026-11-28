@@ -8,6 +8,22 @@ All notable changes to this project are documented here. Format based on
 
 ### Added
 
+- Offline ArmPi Ultra × ore_sorting reference integration:
+  `scripts/armpi_ore_sorting_reference.py` validates a pinned
+  `jcheng.device_snapshot.v1` and `jcheng.scenario_requirements.v1` pair
+  (schema, identity, versions and canonical `content_hash`), matches every
+  required capability, builds a deterministic plan through the existing
+  recipe model, and executes it on the loopback mock gateway with the existing
+  supervised lease and linear runner. It verifies lease acquisition/release,
+  one stop and S1 `request_accepted` on an injected rejection, writes
+  explicitly synthetic JSONL samples and `reference_report.json`, optionally
+  checks declared simulation asset references and invokes the
+  `jcheng-benchmark` CLI as a subprocess. No device, DDS, ROS, hardware task
+  result or benchmark threshold is involved; the report records
+  `task_evaluation.evaluated: false`.
+- `tests/integration/` with pinned device/scenario fixtures (provenance in
+  comments) and 23 offline tests, plus
+  [`docs/REFERENCE_INTEGRATION.md`](docs/REFERENCE_INTEGRATION.md).
 - M4 target gate: `run --target hardware` requires `--evidence-class L5` and a
   gateway advertising `hardware`; `--target mock` rejects L5. A mismatch is
   refused before `load_recipe`, the lease or any submission. The output records
