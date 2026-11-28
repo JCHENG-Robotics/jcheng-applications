@@ -38,6 +38,7 @@ field without regenerating the hash is reported as a stale artifact.
 from __future__ import annotations
 
 import argparse
+import math
 from dataclasses import dataclass
 from hashlib import sha256
 import json
@@ -100,6 +101,7 @@ _DEVICE_KEYS = frozenset(
         "safety_overlay",
     }
 )
+_DEVICE_OPTIONAL_KEYS = frozenset({"notes"})
 _SCENARIO_KEYS = frozenset(
     {
         "schema",
@@ -409,7 +411,12 @@ def _check_hash(document: Mapping[str, Any], code: str, label: str) -> str:
 def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
     """Validate a ``jcheng.device_snapshot.v1`` document."""
 
-    _exact_keys(document, _DEVICE_KEYS, "device_snapshot")
+    _optional_keys(
+        document,
+        required=_DEVICE_KEYS,
+        allowed=_DEVICE_KEYS | _DEVICE_OPTIONAL_KEYS,
+        where="device_snapshot",
+    )
     if document["schema"] != DEVICE_SCHEMA:
         _fail(
             "SCHEMA",
@@ -450,15 +457,27 @@ def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
         if capability_id in seen:
             _fail("SCHEMA", f"{where}.id: duplicate capability {capability_id!r}")
         seen.add(capability_id)
-        parameters = _parameters(item["parameters"], f"{where}.parameters")
+        raw_parameters = item["parameters"]
+        if isinstance(raw_parameters, list):
+            # A device profile may declare parameter descriptors (name/type/
+            # unit/description) rather than values. They are not matchable
+            # values; keep an empty value map and record no invented values.
+            for parameter_index, descriptor in enumerate(raw_parameters):
+                _mapping(descriptor, f"{where}.parameters[{parameter_index}]")
+            parameters: dict[str, Any] = {}
+        else:
+            parameters = _parameters(raw_parameters, f"{where}.parameters")
         raw_feedback = item["feedback"]
         if not isinstance(raw_feedback, list):
             _fail("SCHEMA", f"{where}.feedback: must be a list")
         feedback: list[str] = []
         for feedback_index, entry in enumerate(raw_feedback):
-            text = _text(
-                entry, f"{where}.feedback[{feedback_index}]"
-            )
+            if isinstance(entry, Mapping):
+                text = _text(
+                    entry.get("name"), f"{where}.feedback[{feedback_index}].name"
+                )
+            else:
+                text = _text(entry, f"{where}.feedback[{feedback_index}]")
             if text in feedback:
                 _fail(
                     "SCHEMA",
@@ -481,17 +500,40 @@ def device_snapshot_from_mapping(document: Mapping[str, Any]) -> DeviceSnapshot:
     for index, raw in enumerate(raw_joints):
         where = f"device_snapshot.joints[{index}]"
         item = _mapping(raw, where)
-        _exact_keys(item, _JOINT_KEYS, where)
+        if "limits" in item:
+            _optional_keys(
+                item,
+                required=frozenset({"name", "limits"}),
+                allowed=frozenset({"name", "limits", "role"}),
+                where=where,
+            )
+            limits = _mapping(item["limits"], f"{where}.limits")
+            _exact_keys(
+                limits, frozenset({"min_deg", "max_deg"}), f"{where}.limits"
+            )
+            minimum = math.radians(
+                _finite(limits["min_deg"], f"{where}.limits.min_deg")
+            )
+            maximum = math.radians(
+                _finite(limits["max_deg"], f"{where}.limits.max_deg")
+            )
+        else:
+            _optional_keys(
+                item,
+                required=_JOINT_KEYS,
+                allowed=_JOINT_KEYS | frozenset({"role"}),
+                where=where,
+            )
+            minimum = _finite(item["min_rad"], f"{where}.min_rad")
+            maximum = _finite(item["max_rad"], f"{where}.max_rad")
         name = _text(item["name"], f"{where}.name")
         if not _JOINT_NAME_RE.fullmatch(name):
             _fail("SCHEMA", f"{where}.name: must match {_JOINT_NAME_RE.pattern}")
         if name in joint_names:
             _fail("SCHEMA", f"{where}.name: duplicate joint {name!r}")
         joint_names.add(name)
-        minimum = _finite(item["min_rad"], f"{where}.min_rad")
-        maximum = _finite(item["max_rad"], f"{where}.max_rad")
         if minimum > maximum:
-            _fail("SCHEMA", f"{where}: min_rad must not exceed max_rad")
+            _fail("SCHEMA", f"{where}: min must not exceed max")
         joints.append(Joint(name=name, min_rad=minimum, max_rad=maximum))
 
     safety_overlay = _mapping(
