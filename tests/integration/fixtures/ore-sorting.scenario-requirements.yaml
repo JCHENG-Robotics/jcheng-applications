@@ -1,0 +1,76 @@
+# Pinned offline scenario requirements for the ArmPi Ultra x ore_sorting
+# reference.
+#
+# Provenance
+# - Shape: jcheng.scenario_requirements.v1 (Phase 2 design, MIG-02).
+# - Source: jcheng-scenarios/scenarios/ore_sorting at 0.1.0
+#   (scenario.yaml, capability-requirements.yaml, task.yaml, evaluation.yaml).
+#   The scenario repository remains the owner of the scenario; this is a
+#   pinned consumer copy for an offline application reference.
+# - Requirement values are design targets copied from the scenario profile,
+#   not measured acceptance criteria. No threshold is set and no success
+#   judgement is encoded here.
+# - The real scenario profile declares no simulation assets yet, so this
+#   fixture has no simulation_assets key; the reference records the simulation
+#   check as not_checked unless a separate artifact declares assets.
+#
+# Do not treat this file as a hardware test specification.
+schema: jcheng.scenario_requirements.v1
+scenario_id: ore_sorting
+scenario_version: 0.1.0
+content_hash: "sha256:99b3fac27142329643e4680f3d0aa833f27024c43d1de5bda8eaeb8cd24dd721"
+task_id: ore_sorting.task@0.1.0
+evaluation_id: ore_sorting.evaluation@0.1.0
+capabilities:
+  - id: manipulation.arm.reach_m
+    required: true
+    parameters:
+      reach_m: {op: ">=", value: 0.45}
+  - id: manipulation.arm.payload_kg
+    required: true
+    parameters:
+      payload_kg: {op: ">=", value: 0.20}
+  - id: manipulation.arm.dof
+    required: true
+    parameters:
+      dof: {op: ">=", value: 4}
+  - id: manipulation.gripper.aperture_m
+    required: true
+    parameters:
+      aperture_m: {op: ">=", value: 0.04}
+  - id: sensing.camera.resolution_px
+    required: true
+    parameters:
+      width_px: {op: ">=", value: 640}
+      height_px: {op: ">=", value: 480}
+  - id: perception.instance_segmentation
+    required: true
+  - id: perception.scene_state
+    required: true
+  - id: perception.reachability
+    required: true
+  # Optional in this reference: the v0.1.0 ore_sorting workcell is stationary.
+  - id: manipulation.base.velocity_intent
+    required: false
+constraints:
+  - id: motion_via_system_only
+    statement: >-
+      Any future motion is submitted as intent through the system gateway and
+      executed only by ExecuteMotion under lease, deadman, limits and the stop
+      latch. The scenario never commands motion.
+  - id: no_grade_claim
+    statement: >-
+      The task never asserts ore grade, composition, mass or value. A class
+      label is an observable category, not an assay.
+  - id: no_gangue_to_ore_bin
+    statement: >-
+      A gangue instance placed in the ore bin counts as a misclassification
+      failure.
+provenance:
+  repo: jcheng-scenarios
+  source_path: scenarios/ore_sorting/capability-requirements.yaml
+  source_kind: design
+  pinned_at: "2026-11-28"
+  note: >-
+    Offline pinned consumer copy for jcheng-applications; the scenario
+    repository remains the source of truth.

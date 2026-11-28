@@ -1,0 +1,67 @@
+# Pinned offline fixture for the ArmPi Ultra x ore_sorting reference.
+#
+# Provenance
+# - Shape: jcheng.device_snapshot.v1 (Phase 2 design, MIG-01).
+# - Device: hiwonder.armpi-ultra arm plus hiwonder.armpi-ultra-gripper, from
+#   the jcheng-devices registry profiles at 2026-11-27.
+# - Capability parameter values are fixture declarations for offline matching,
+#   NOT measurements. jcheng-devices records payload, repeatability, absolute
+#   accuracy and the workspace envelope as unmeasured; reach_m, payload_kg,
+#   aperture_m and the camera resolution here are chosen to exercise the
+#   matcher and must not be read as device specifications.
+# - The abstract capability IDs mirror the scenario requirement vocabulary.
+#   The device registry uses native IDs (arm.position_control, ...); this
+#   mapping is a fixture decision for the reference, not a new contract.
+# - No devices generator exists yet, so this file is hand-pinned;
+#   generated_by and source_path record the intended generation source.
+#
+# Do not send this file, or a plan built from it, to a robot.
+schema: jcheng.device_snapshot.v1
+source_device: hiwonder.armpi-ultra
+device_version: 0.1.0
+content_hash: "sha256:c3468b33be70bc47bbad839446c59267f04b168cba08e973d945a14633c4e16e"
+generated_by: "jcheng-devices snapshot fixture (offline reference, hand-pinned 2026-11-28)"
+source_path: "jcheng-devices/registry/devices/hiwonder.armpi-ultra.yaml"
+capabilities:
+  - id: manipulation.arm.reach_m
+    parameters:
+      reach_m: 0.50
+    feedback: [bus_position]
+  - id: manipulation.arm.payload_kg
+    parameters:
+      payload_kg: 0.25
+    feedback: []
+  - id: manipulation.arm.dof
+    parameters:
+      dof: 5
+    feedback: [bus_position]
+  - id: manipulation.gripper.aperture_m
+    parameters:
+      aperture_m: 0.045
+    feedback: [bus_position]
+  - id: sensing.camera.resolution_px
+    parameters:
+      width_px: 640
+      height_px: 480
+    feedback: [rgb_frame]
+  - id: perception.instance_segmentation
+    parameters: {}
+    feedback: [advisory_instance_mask]
+  - id: perception.scene_state
+    parameters: {}
+    feedback: [advisory_scene_state]
+  - id: perception.reachability
+    parameters: {}
+    feedback: [advisory_reachability]
+joints:
+  - {name: joint1, min_rad: -1.8012, max_rad: 1.8012}
+  - {name: joint2, min_rad: -0.6618, max_rad: 1.1519}
+  - {name: joint3, min_rad: -1.8012, max_rad: 0.0}
+  - {name: joint4, min_rad: -1.5917, max_rad: 1.5917}
+  - {name: joint5, min_rad: -1.5917, max_rad: 1.5499}
+safety_overlay:
+  source: jcheng-system
+  note: >-
+    No system tightening is applied in this offline fixture; the reference
+    claims no limit. A deployed snapshot carries the system-owned overlay.
+  max_velocity_rad_s: 0.4
