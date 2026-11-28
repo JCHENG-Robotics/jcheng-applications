@@ -170,6 +170,13 @@ _JOINT_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _PARAMETER_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
+_FACT_UNITS = {
+    "dof": "joints",
+    "reach_m": "m",
+    "payload_kg": "kg",
+    "aperture_m": "m",
+    "resolution_px": "px",
+}
 _ORDERING_OPS = frozenset({">=", "<=", ">", "<"})
 _COMPARISON_OPS = _ORDERING_OPS | frozenset({"==", "!="})
 
@@ -1174,6 +1181,14 @@ def _match_cell(
             )
             continue
 
+        property_name = requirement.id.rsplit(".", 1)[-1]
+        expected_unit = _FACT_UNITS.get(property_name)
+        if expected_unit is not None and requirement.threshold["unit"] != expected_unit:
+            _fail(
+                "INCOMPATIBLE_UNIT",
+                f"device requirement {requirement.id!r} uses unit "
+                f"{requirement.threshold['unit']!r}, expected {expected_unit!r}",
+            )
         actual = _declared_fact(device, capability, requirement)
         if actual is None:
             unverified.append(
